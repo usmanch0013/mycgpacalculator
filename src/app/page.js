@@ -1,69 +1,57 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import { Suspense } from 'react';
+import Navbar from '@/components/Navbar';
+import Hero from '@/components/Hero';
+import CalculatorTabs from '@/components/CalculatorTabs';
+import FeaturesSection from '@/components/FeaturesSection';
+import FormulaSection from '@/components/FormulaSection';
+import UniversityGrid from '@/components/UniversityGrid';
+import RegionBanner from '@/components/RegionBanner';
+import MalaysiaBanner from '@/components/MalaysiaBanner';
+import SEOArticle from '@/components/SEOArticle';
+import FAQ from '@/components/FAQ';
+import InternalLinkHub from '@/components/InternalLinkHub';
+import JsonLd from '@/components/JsonLd';
+import Footer from '@/components/Footer';
+import { getHomepageLinkGroups } from '@/lib/internalLinks';
+import { buildPageMetadata, HOMEPAGE_JSON_LD } from '@/lib/seo';
+
+export const metadata = buildPageMetadata({
+  title: 'CGPA Calculator — Free GPA to Percentage Converter Online',
+  description:
+    'Free CGPA calculator online — calculate semester GPA, cumulative CGPA, and convert CGPA to percentage. UTM, UiTM, SRM, NSU, VIT, NUST & 60+ university grading scales. No signup.',
+  path: '/',
+  openGraph: {
+    title: 'CGPA Calculator — Free GPA & Percentage Converter',
+    description:
+      'Calculate CGPA, semester GPA, and CGPA to percentage instantly. University-specific calculators for Bangladesh, India, Pakistan, UK & Europe.',
+  },
+});
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <>
+      <JsonLd data={HOMEPAGE_JSON_LD} />
+      <Navbar />
+      <main id="main-content">
+        <Hero />
+        <Suspense fallback={<div className="calc-section"><div className="container text-center" style={{ padding: '4rem 0', color: 'var(--text-tertiary)' }}>Loading calculator…</div></div>}>
+          <CalculatorTabs />
+        </Suspense>
+        <FeaturesSection />
+        <FormulaSection />
+        <UniversityGrid />
+        <MalaysiaBanner />
+        <RegionBanner />
+        <SEOArticle />
+        <InternalLinkHub
+          title="Explore calculators & guides"
+          subtitle="Jump to popular university pages, country directories, and help resources."
+          groups={getHomepageLinkGroups()}
+          variant="muted"
         />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.js</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+        <FAQ />
       </main>
-    </div>
+      <Footer />
+    </>
   );
 }
