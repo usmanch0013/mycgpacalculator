@@ -12,7 +12,7 @@ import JsonLd from '@/components/JsonLd';
 export const metadata = buildPageMetadata({
   title: 'All Supported Universities',
   description:
-    'Browse 60+ university CGPA calculators on MyCGPA — Bangladesh, India, Pakistan, Malaysia, UK, and Europe. UTM, UiTM, SRM, NSU and more with official grading scales.',
+    'Browse 60+ university CGPA calculators on CGPA Calculator Pro — Bangladesh, India, Pakistan, Malaysia, UK, and Europe. UTM, UiTM, SRM, NSU and more with official grading scales.',
   path: '/universities',
 });
 

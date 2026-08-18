@@ -58,8 +58,8 @@ export default function Logo({ variant = 'full', className = '' }) {
       )}
       {showWordmark && (
         <span className="logo-wordmark">
-          <span className="logo-wordmark-my">My</span>
           <span className="logo-wordmark-cgpa">CGPA</span>
+          <span className="logo-wordmark-pro">Pro</span>
         </span>
       )}
     </span>

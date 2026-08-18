@@ -9,7 +9,7 @@ import { buildPageMetadata } from '@/lib/seo';
 export const metadata = buildPageMetadata({
   title: 'Contact Us',
   description:
-    'Reach the MyCGPA team — report bugs, request new universities, or ask about CGPA calculations and grading scales.',
+    'Reach the CGPA Calculator Pro team — report bugs, request new universities, or ask about CGPA calculations and grading scales.',
   path: '/contact',
 });
 
@@ -42,7 +42,7 @@ export default function ContactPage() {
                 <h2 className="info-card-heading">Direct email</h2>
                 <p>
                   Prefer email? Write to{' '}
-                  <a href="mailto:hello@mycgpa.com">hello@mycgpa.com</a>
+                  <a href="mailto:hello@cgpacalculatorpro.com">hello@cgpacalculatorpro.com</a>
                 </p>
               </div>
               <div className="info-card">

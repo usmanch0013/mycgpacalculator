@@ -3,7 +3,8 @@
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || 'https://cgpacalculatorpro.com';
 
-export const SITE_NAME = 'MyCGPA';
+export const SITE_NAME = 'CGPA Calculator Pro';
+export const SITE_EMAIL = 'hello@cgpacalculatorpro.com';
 export const SITE_TAGLINE = 'Free CGPA & GPA Calculator for Students Worldwide';
 export const DEFAULT_OG_IMAGE = '/logo.svg';
 
@@ -125,7 +126,7 @@ export function buildOrganizationSchema() {
     contactPoint: {
       '@type': 'ContactPoint',
       contactType: 'customer support',
-      email: 'hello@mycgpa.com',
+      email: SITE_EMAIL,
       url: absoluteUrl('/contact'),
     },
   };
@@ -292,7 +293,7 @@ export function buildCountryCollectionSchema(country, countrySlug, universities)
 export function buildUniversitiesDirectorySchema(universities) {
   return buildJsonLdGraph({
     '@type': 'CollectionPage',
-    name: 'All Supported Universities — MyCGPA',
+    name: 'All Supported Universities — CGPA Calculator Pro',
     url: absoluteUrl('/universities'),
     description: 'Directory of university-specific CGPA and GPA calculators across Bangladesh, India, Pakistan, Malaysia, UK, and Europe.',
     isPartOf: { '@id': `${SITE_URL}/#website` },

@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { GRADING_SYSTEMS, getMaxGradePoint } from '@/lib/gradingSystems';
+import { SITE_NAME } from '@/lib/seo';
 
 function getHonoursClass(gpa, maxScore) {
   const pct = (parseFloat(gpa) / parseFloat(maxScore)) * 100;
@@ -157,7 +158,7 @@ export default function CalculatorTabs({
 
   const copyResult = async () => {
     const uniLabel = university ? `${university.shortName} — ` : '';
-    const text = `${uniLabel}MyCGPA Result\nGrading: ${gradingSystem}\nGPA/CGPA: ${activeResult} / ${maxScore}\nCalculated at MyCGPA`;
+    const text = `${uniLabel}${SITE_NAME} Result\nGrading: ${gradingSystem}\nGPA/CGPA: ${activeResult} / ${maxScore}\nCalculated at ${SITE_NAME}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);

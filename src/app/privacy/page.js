@@ -5,7 +5,7 @@ import { buildPageMetadata } from '@/lib/seo';
 export const metadata = buildPageMetadata({
   title: 'Privacy Policy',
   description:
-    'How MyCGPA handles your data. We do not collect grades or personal information — your calculations stay in your browser.',
+    'How CGPA Calculator Pro handles your data. We do not collect grades or personal information — your calculations stay in your browser.',
   path: '/privacy',
 });
 
@@ -29,7 +29,7 @@ export default function PrivacyPage() {
   return (
     <PageLayout
       title="Privacy Policy"
-      subtitle="We built MyCGPA to help students, not to collect their data. Here is exactly what happens when you use our site — written in plain language, not legal jargon."
+      subtitle="We built CGPA Calculator Pro to help students, not to collect their data. Here is exactly what happens when you use our site — written in plain language, not legal jargon."
       toc={toc}
       linkGroups={getLegalPageLinkGroups()}
     >
@@ -102,7 +102,7 @@ export default function PrivacyPage() {
       </p>
 
       <h2 id="third-party">Third-party services</h2>
-      <p>MyCGPA relies on external services to operate:</p>
+      <p>CGPA Calculator Pro relies on external services to operate:</p>
       <ul>
         <li><strong>Hosting providers</strong> — serve website files to your browser</li>
         <li><strong>Analytics tools</strong> — may include Google Analytics for aggregated traffic stats</li>
@@ -122,13 +122,13 @@ export default function PrivacyPage() {
       </p>
       <p>
         We use HTTPS encryption for all pages, keep software updated, and follow reasonable security practices.
-        No online service is 100% secure, but we design MyCGPA so that the most sensitive data — your grades — never
+        No online service is 100% secure, but we design CGPA Calculator Pro so that the most sensitive data — your grades — never
         reaches our servers in the first place.
       </p>
 
       <h2 id="children">Children and students</h2>
       <p>
-        MyCGPA is designed for students of all ages, including those under 13. We do not knowingly collect personal
+        CGPA Calculator Pro is designed for students of all ages, including those under 13. We do not knowingly collect personal
         information from children. Since we do not require accounts and do not store calculator inputs on our servers,
         there is typically no personal data to collect from anyone, regardless of age.
       </p>
@@ -153,12 +153,12 @@ export default function PrivacyPage() {
 
       <h2 id="international">International users</h2>
       <p>
-        MyCGPA is used by students in Bangladesh, India, Pakistan, Malaysia, the UK, Europe, and elsewhere. If you access our site
+        CGPA Calculator Pro is used by students in Bangladesh, India, Pakistan, Malaysia, the UK, Europe, and elsewhere. If you access our site
         from the European Economic Area (EEA), UK, or other regions with data protection laws, you have additional rights
         under GDPR and similar regulations. We apply the same privacy principles to all users regardless of location.
       </p>
       <p>
-        Our servers may be located in countries different from yours. By using MyCGPA, you acknowledge that your
+        Our servers may be located in countries different from yours. By using CGPA Calculator Pro, you acknowledge that your
         anonymous analytics data may be processed in those locations with appropriate safeguards.
       </p>
 
@@ -166,14 +166,14 @@ export default function PrivacyPage() {
       <p>
         We may update this page as the site grows — for example, if we add new features, ad partners, or analytics tools.
         When we do, we will change the &quot;Last updated&quot; date at the top. Significant changes will be noted in this section.
-        Continuing to use MyCGPA after an update means you accept the revised policy.
+        Continuing to use CGPA Calculator Pro after an update means you accept the revised policy.
       </p>
 
       <h2 id="contact">Questions?</h2>
       <p>
         Privacy policies should not require a law degree to understand. If anything here is unclear, or you want to
         know something specific about your data, visit our <a href="/contact">Contact page</a> or email{' '}
-        <a href="mailto:hello@mycgpa.com">hello@mycgpa.com</a>. We read every message and try to reply within a few days.
+        <a href="mailto:hello@cgpacalculatorpro.com">hello@cgpacalculatorpro.com</a>. We read every message and try to reply within a few days.
       </p>
     </PageLayout>
   );

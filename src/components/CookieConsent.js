@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-const STORAGE_KEY = 'mycgpa_cookie_consent';
+const STORAGE_KEY = 'cgpacalcpro_cookie_consent';
 
 export default function CookieConsent() {
   const [visible, setVisible] = useState(false);
@@ -31,7 +31,7 @@ export default function CookieConsent() {
     <div className="cookie-banner" role="dialog" aria-live="polite" aria-label="Cookie notice">
       <div className="cookie-banner-inner container">
         <p className="cookie-banner-text">
-          We use cookies for basic site features and, once approved, to show ads that help keep MyCGPA free.
+          We use cookies for basic site features and, once approved, to show ads that help keep CGPA Calculator Pro free.
           Your calculator grades never leave your browser. Read our{' '}
           <Link href="/cookies">Cookie Policy</Link> and{' '}
           <Link href="/privacy">Privacy Policy</Link>.

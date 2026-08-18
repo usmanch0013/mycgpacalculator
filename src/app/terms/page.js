@@ -4,7 +4,7 @@ import { buildPageMetadata } from '@/lib/seo';
 
 export const metadata = buildPageMetadata({
   title: 'Terms of Service',
-  description: 'Simple, fair terms for using MyCGPA — a free CGPA and GPA calculator for students worldwide.',
+  description: 'Simple, fair terms for using CGPA Calculator Pro — a free CGPA and GPA calculator for students worldwide.',
   path: '/terms',
 });
 
@@ -26,11 +26,11 @@ export default function TermsPage() {
   return (
     <PageLayout
       title="Terms of Service"
-      subtitle="Nothing complicated here. Just ground rules so we can keep MyCGPA free, accurate, and useful for students everywhere."
+      subtitle="Nothing complicated here. Just ground rules so we can keep CGPA Calculator Pro free, accurate, and useful for students everywhere."
       toc={toc}
       linkGroups={getLegalPageLinkGroups()}
     >
-      <h2 id="agreement">By using MyCGPA, you agree to these terms</h2>
+      <h2 id="agreement">By using CGPA Calculator Pro, you agree to these terms</h2>
       <p>
         That sounds formal, but it basically means: use the site responsibly, do not try to break it, and understand
         that our calculator gives estimates — not official academic records. If that works for you, you are good to go.
@@ -40,9 +40,9 @@ export default function TermsPage() {
         classification for Oxford, or converting percentages for an IIT application.
       </p>
 
-      <h2 id="service">What MyCGPA is (and is not)</h2>
+      <h2 id="service">What CGPA Calculator Pro is (and is not)</h2>
       <p>
-        MyCGPA is a free online tool that helps students calculate semester GPA, cumulative CGPA, and rough
+        CGPA Calculator Pro is a free online tool that helps students calculate semester GPA, cumulative CGPA, and rough
         percentage conversions using publicly documented grading scales — mainly in South Asia, Malaysia,
         the UK, and Europe.
       </p>
@@ -66,7 +66,7 @@ export default function TermsPage() {
       </p>
 
       <h2 id="acceptable">Acceptable use</h2>
-      <p>You are welcome to use MyCGPA for personal, educational, and non-commercial purposes. Please do not:</p>
+      <p>You are welcome to use CGPA Calculator Pro for personal, educational, and non-commercial purposes. Please do not:</p>
       <ul>
         <li>Scrape, copy, or republish large portions of the site without permission</li>
         <li>Attempt to hack, overload, reverse-engineer, or disrupt our servers</li>
@@ -78,27 +78,27 @@ export default function TermsPage() {
 
       <h2 id="ip">Intellectual property</h2>
       <p>
-        The MyCGPA name, design, written content, calculator logic, and branding belong to us. You may link to our site,
+        The CGPA Calculator Pro name, design, written content, calculator logic, and branding belong to us. You may link to our site,
         share it with classmates, and use the calculators freely for personal academic purposes. You may not clone the
         entire site and sell it as your own product without written consent.
       </p>
 
       <h2 id="ads">Ads and third-party links</h2>
       <p>
-        MyCGPA may display advertising to remain free. Clicking an ad takes you to a third-party site — we are not
+        CGPA Calculator Pro may display advertising to remain free. Clicking an ad takes you to a third-party site — we are not
         responsible for their content or practices. External links are provided for convenience, not endorsement.
       </p>
 
       <h2 id="disclaimer">Disclaimer of warranties</h2>
       <p>
-        We work hard to keep MyCGPA accurate and available, but the site is provided &quot;as is&quot; without warranties
+        We work hard to keep CGPA Calculator Pro accurate and available, but the site is provided &quot;as is&quot; without warranties
         of any kind. We do not guarantee uninterrupted access, error-free calculations, or compatibility with every device.
         Use results as a helpful guide, not as an official document.
       </p>
 
       <h2 id="liability">Limitation of liability</h2>
       <p>
-        To the fullest extent permitted by law, MyCGPA and its creators are not liable for any loss or damage arising
+        To the fullest extent permitted by law, CGPA Calculator Pro and its creators are not liable for any loss or damage arising
         from your use of the site — including missed deadlines, incorrect applications, or decisions made based on
         calculator results. Your academic decisions remain yours to make.
       </p>

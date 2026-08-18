@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 export default function InternalLinkHub({
-  title = 'Explore more on MyCGPA',
+  title = 'Explore more on CGPA Calculator Pro',
   subtitle,
   groups,
   variant = 'default',

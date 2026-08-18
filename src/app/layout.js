@@ -12,8 +12,8 @@ import {
 export const metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "CGPA Calculator — Free GPA to Percentage Converter Online | MyCGPA",
-    template: "%s | MyCGPA",
+    default: `CGPA Calculator — Free GPA to Percentage Converter Online | ${SITE_NAME}`,
+    template: `%s | ${SITE_NAME}`,
   },
   description:
     "Free CGPA calculator online — calculate semester GPA, cumulative CGPA, and convert CGPA to percentage. UTM, UiTM, SRM, NSU, VIT, NUST & 60+ university grading scales.",

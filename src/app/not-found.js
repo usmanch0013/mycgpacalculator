@@ -7,7 +7,7 @@ import { buildPageMetadata } from '@/lib/seo';
 
 export const metadata = buildPageMetadata({
   title: 'Page Not Found',
-  description: 'The page you are looking for does not exist. Browse MyCGPA calculators or return to the homepage.',
+  description: 'The page you are looking for does not exist. Browse CGPA Calculator Pro calculators or return to the homepage.',
   path: '/404',
   noIndex: true,
 });

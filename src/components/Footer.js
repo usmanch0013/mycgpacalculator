@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Logo from '@/components/Logo';
+import { SITE_NAME, SITE_EMAIL } from '@/lib/seo';
 
 export default function Footer() {
   const year = new Date().getFullYear();
@@ -9,7 +10,7 @@ export default function Footer() {
       <div className="container">
         <div className="footer-grid">
           <div className="footer-brand-col">
-            <Link href="/" className="footer-brand-link" aria-label="MyCGPA Home">
+            <Link href="/" className="footer-brand-link" aria-label={`${SITE_NAME} Home`}>
               <span className="footer-brand">
                 <Logo variant="full" className="logo--footer" />
               </span>
@@ -17,8 +18,8 @@ export default function Footer() {
             <p className="footer-desc">
               Free CGPA calculators with your university grading scale built in. No signup — everything runs in your browser.
             </p>
-            <a href="mailto:hello@mycgpa.com" className="footer-email">
-              hello@mycgpa.com
+            <a href={`mailto:${SITE_EMAIL}`} className="footer-email">
+              {SITE_EMAIL}
             </a>
           </div>
 
@@ -66,7 +67,7 @@ export default function Footer() {
         </div>
 
         <div className="footer-bottom">
-          <p className="footer-copy">© {year} MyCGPA. All rights reserved.</p>
+          <p className="footer-copy">© {year} {SITE_NAME}. All rights reserved.</p>
           <nav className="footer-legal" aria-label="Legal links">
             <Link href="/privacy">Privacy</Link>
             <span className="footer-legal-sep" aria-hidden="true">·</span>

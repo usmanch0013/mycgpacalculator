@@ -137,10 +137,10 @@ ul { list-style: none; }
   letter-spacing: -0.04em;
   line-height: 1;
 }
-.logo-wordmark-my {
+.logo-wordmark-cgpa {
   color: var(--primary);
 }
-.logo-wordmark-cgpa {
+.logo-wordmark-pro {
   color: var(--accent);
 }
 .logo--footer .logo-mark {

@@ -5,7 +5,7 @@ import { buildPageMetadata } from '@/lib/seo';
 export const metadata = buildPageMetadata({
   title: 'About Us',
   description:
-    'Who runs MyCGPA, why we built a free CGPA calculator, and how we keep grading scales accurate for students in Bangladesh, India, Pakistan, Malaysia, and beyond.',
+    'Who runs CGPA Calculator Pro, why we built a free CGPA calculator, and how we keep grading scales accurate for students in Bangladesh, India, Pakistan, Malaysia, and beyond.',
   path: '/about',
 });
 
@@ -23,7 +23,7 @@ const toc = (
 export default function AboutPage() {
   return (
     <PageLayout
-      title="About MyCGPA"
+      title="About CGPA Calculator Pro"
       subtitle="We got tired of CGPA calculators that ask for your email before showing a number. So we built one that does not."
       toc={toc}
       linkGroups={getLegalPageLinkGroups()}
@@ -36,7 +36,7 @@ export default function AboutPage() {
       </p>
       <p>
         Most calculator sites we tried were either stuck on one country, covered in pop-ups, or wanted a sign-up before
-        you could see anything. MyCGPA started as a weekend project to fix that: one clean page, correct grading tables,
+        you could see anything. CGPA Calculator Pro started as a weekend project to fix that: one clean page, correct grading tables,
         no account. It grew from there because students kept asking for their specific university.
       </p>
 
@@ -70,7 +70,7 @@ export default function AboutPage() {
       <p>
         Grading tables change. Faculties publish updates in PDFs nobody reads until something breaks. We check handbooks,
         student feedback, and official pages when we can. Still, always treat your registrar&apos;s transcript as the final word —
-        use MyCGPA to plan and double-check, not as an official certificate.
+        use CGPA Calculator Pro to plan and double-check, not as an official certificate.
       </p>
 
       <h2 id="next">What is next</h2>

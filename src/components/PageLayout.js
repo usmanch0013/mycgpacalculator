@@ -44,7 +44,7 @@ export default function PageLayout({
 
         {linkGroups && (
           <InternalLinkHub
-            title="Explore MyCGPA"
+            title="Explore CGPA Calculator Pro"
             groups={linkGroups}
             variant="muted"
           />

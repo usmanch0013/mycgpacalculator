@@ -1,10 +1,11 @@
 import Logo from '@/components/Logo';
+import { SITE_NAME } from '@/lib/seo';
 
 export default function Navbar() {
   return (
     <header className="nav-header">
       <div className="container nav-container">
-        <a href="/" className="nav-logo" aria-label="MyCGPA Home">
+        <a href="/" className="nav-logo" aria-label={`${SITE_NAME} Home`}>
           <Logo />
         </a>
         <nav className="nav-links" aria-label="Main navigation">

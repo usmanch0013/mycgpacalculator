@@ -30,7 +30,7 @@ export const RESOURCE_LINKS = [
   { href: '/#faq', label: 'FAQ' },
   { href: '/universities', label: 'All Universities' },
   { href: '/universities/uk-europe', label: 'UK & Europe Calculators' },
-  { href: '/about', label: 'About MyCGPA' },
+  { href: '/about', label: 'About CGPA Calculator Pro' },
   { href: '/contact', label: 'Contact Us' },
 ];
 

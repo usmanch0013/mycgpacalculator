@@ -4,7 +4,7 @@ import { buildPageMetadata } from '@/lib/seo';
 
 export const metadata = buildPageMetadata({
   title: 'Cookie Policy',
-  description: 'What cookies MyCGPA uses, why they exist, and how you can control them.',
+  description: 'What cookies CGPA Calculator Pro uses, why they exist, and how you can control them.',
   path: '/cookies',
 });
 
@@ -38,7 +38,7 @@ export default function CookiesPage() {
         <strong>persistent cookies</strong> (stay until they expire or you delete them).
       </p>
 
-      <h2 id="use">Does MyCGPA use cookies?</h2>
+      <h2 id="use">Does CGPA Calculator Pro use cookies?</h2>
       <p>
         Yes, but sparingly. Because we may show ads to keep the site free, some cookies come from advertising partners.
         We never use cookies to track your academic data — your calculator inputs stay in your browser and are never
@@ -66,7 +66,7 @@ export default function CookiesPage() {
 
       <h2 id="third-party">Third-party cookies</h2>
       <p>
-        When you see an ad on MyCGPA, that ad may set its own cookies governed by the advertiser&apos;s policy.
+        When you see an ad on CGPA Calculator Pro, that ad may set its own cookies governed by the advertiser&apos;s policy.
         Google&apos;s advertising cookie policy is at{' '}
         <a href="https://policies.google.com/technologies/ads" target="_blank" rel="noopener noreferrer">
           policies.google.com/technologies/ads
