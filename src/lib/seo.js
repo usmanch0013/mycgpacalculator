@@ -1,7 +1,7 @@
 /** @typedef {{ question: string, answer: string }} FaqItem */
 
 export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || 'https://mycgpa.com';
+  process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || 'https://cgpacalculatorpro.com';
 
 export const SITE_NAME = 'MyCGPA';
 export const SITE_TAGLINE = 'Free CGPA & GPA Calculator for Students Worldwide';
