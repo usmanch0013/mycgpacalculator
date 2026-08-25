@@ -26,7 +26,7 @@ const EMPTY = {
   excerpt: "",
   content: "",
   status: "draft" as PostStatus,
-  author: "Editor",
+  author: "CGPA Calculator Pro",
   featuredImage: "",
 };
 
@@ -248,7 +248,7 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
                   <input
                     value={form.focusKeyword}
                     onChange={(e) => update("focusKeyword", e.target.value)}
-                    placeholder="e.g. salary after tax"
+                    placeholder="e.g. how to calculate cgpa"
                   />
                 </label>
 

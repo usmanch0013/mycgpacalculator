@@ -250,7 +250,7 @@ export function analyzeSeo(
     )
   );
 
-  const hasInternal = /\[([^\]]+)\]\(\/(blog|calculators|salary|hourly|faq|contact)/.test(
+  const hasInternal = /\[([^\]]+)\]\(\/(blog|calculator|universities|about|contact|privacy|terms)/.test(
     content
   );
   checks.push(

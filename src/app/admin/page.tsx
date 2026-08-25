@@ -25,8 +25,8 @@ export default async function AdminDashboardPage() {
           <p className="admin-hero__eyebrow">Welcome back</p>
           <h1 className="admin-hero__title">Your content dashboard</h1>
           <p className="admin-hero__desc">
-            Write salary &amp; tax articles, track Rank Math style SEO scores, and publish
-            straight to your site.
+            Write CGPA, GPA, and grading guides, track Rank Math style SEO scores, and publish
+            straight to CGPA Calculator Pro.
           </p>
           <div className="admin-hero__actions">
             <Link href="/admin/posts/new" className="admin-btn admin-btn--primary">
@@ -99,7 +99,7 @@ export default async function AdminDashboardPage() {
             <ol className="admin-empty__steps">
               <li><span>1</span> Write a clear title with your keyword</li>
               <li><span>2</span> Fill SEO sidebar — meta description &amp; image</li>
-              <li><span>3</span> Publish — live at aussalaryaftertax.com/your-slug</li>
+              <li><span>3</span> Publish — live at cgpacalculatorpro.com/your-slug</li>
             </ol>
             <Link href="/admin/posts/new" className="admin-btn admin-btn--primary admin-btn--lg">
               Write first article
@@ -156,7 +156,7 @@ export default async function AdminDashboardPage() {
                         <SeoBadge score={seo.score} />
                       </td>
                       <td className="admin-table__date">
-                        {new Date(post.publishedAt).toLocaleDateString("en-AU", {
+                        {new Date(post.publishedAt).toLocaleDateString("en-US", {
                           day: "numeric",
                           month: "short",
                           year: "numeric",

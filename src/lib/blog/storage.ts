@@ -75,7 +75,7 @@ export async function createPost(input: BlogPostInput): Promise<BlogPost> {
     status: input.status,
     publishedAt: input.publishedAt ?? now,
     updatedAt: now,
-    author: input.author?.trim() || "Editor",
+    author: input.author?.trim() || "CGPA Calculator Pro",
     featuredImage: input.featuredImage?.trim() || undefined,
   };
 

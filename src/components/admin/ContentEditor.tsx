@@ -239,7 +239,7 @@ export default function ContentEditor({
         applyEdit(prefixLines(el, "1. ", "List item"));
         break;
       case "link": {
-        const url = prompt("Link URL (e.g. /calculators)", "/calculators");
+        const url = prompt("Link URL (e.g. /universities)", "/universities");
         if (!url) return;
         applyEdit(wrapSelection(el, "[", `](${url})`, "link text"));
         break;
