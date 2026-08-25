@@ -1,6 +1,31 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import "../styles/admin-panel.css";
 
 :root {
+  /* Admin panel theme aliases (match site brand) */
+  --forest-900: #0b1220;
+  --forest-800: #1e293b;
+  --forest-700: #2563eb;
+  --forest-600: #2563eb;
+  --forest-500: #3b82f6;
+  --amber-500: #2563eb;
+  --amber-400: #60a5fa;
+  --amber-600: #1d4ed8;
+  --stone-150: #f4f6f9;
+  --stone-100: #f8fafc;
+  --stone-200: #e8edf3;
+  --stone-300: #dde3ec;
+  --stone-500: #94a3b8;
+  --stone-600: #475569;
+  --stone-700: #334155;
+  --stone-800: #1e293b;
+  --stone-900: #0b1220;
+  --mint-50: #eff6ff;
+  --card-bg: #ffffff;
+  --rose-600: #dc2626;
+  --rose-700: #b91c1c;
+  --transition: all 0.2s ease;
+
   --bg-body: #f4f6f9;
   --bg-surface: #ffffff;
   --bg-muted: #f8fafc;
