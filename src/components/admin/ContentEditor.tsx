@@ -1,6 +1,10 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState, useCallback, useEffect } from "react";
+import BlockInserterModal from "@/components/admin/BlockInserterModal";
+import VisualEditor, { type VisualCommand, type VisualEditorHandle } from "@/components/admin/VisualEditor";
+import { convertPastedHtmlToContent, getClipboardHtml } from "@/lib/blog/paste-html";
+import { BLOCK_FORMAT_LABELS, type BlockFormat } from "@/lib/blog/visual-html";
 
 interface ContentEditorProps {
   value: string;
@@ -9,25 +13,35 @@ interface ContentEditorProps {
   wordCount?: number;
 }
 
+export type ContentEditorHandle = {
+  flushValue: () => string;
+};
+
+type EditorMode = "visual" | "text";
+
 type ToolId =
-  | "bold"
-  | "italic"
-  | "h2"
-  | "h3"
-  | "quote"
-  | "pullquote"
-  | "callout"
-  | "ul"
-  | "ol"
-  | "link"
+  | VisualCommand
   | "image"
-  | "hr"
+  | "table"
+  | "faq"
+  | "html"
+  | "blocks"
   | "code";
+
+const FORMAT_OPTIONS: BlockFormat[] = [
+  "paragraph",
+  "h2",
+  "h3",
+  "quote",
+  "pullquote",
+  "callout",
+];
 
 interface ToolDef {
   id: ToolId;
   title: string;
   icon: React.ReactNode;
+  wide?: boolean;
 }
 
 const ICON = {
@@ -49,6 +63,7 @@ const ICON = {
     </svg>
   ),
   pullquote: <span className="ce-icon-text">PQ</span>,
+  highlight: <span className="ce-icon-text">HL</span>,
   callout: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
@@ -74,6 +89,10 @@ const ICON = {
       <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
     </svg>
   ),
+  table: <span className="ce-icon-text">Tbl</span>,
+  faq: <span className="ce-icon-text">FAQ</span>,
+  html: <span className="ce-icon-text">HTML</span>,
+  blocks: <span className="ce-icon-text">+</span>,
   hr: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M4 11h16v2H4z" />
@@ -88,37 +107,44 @@ const ICON = {
 
 const TOOL_GROUPS: { label: string; tools: ToolDef[] }[] = [
   {
+    label: "Insert",
+    tools: [
+      { id: "blocks", title: "Insert block", icon: ICON.blocks, wide: true },
+      { id: "table", title: "Insert table", icon: ICON.table },
+      { id: "faq", title: "Insert FAQ accordion", icon: ICON.faq },
+      { id: "html", title: "Insert custom HTML", icon: ICON.html },
+      { id: "image", title: "Upload image", icon: ICON.image },
+    ],
+  },
+  {
     label: "Text",
     tools: [
       { id: "bold", title: "Bold", icon: ICON.bold },
       { id: "italic", title: "Italic", icon: ICON.italic },
       { id: "link", title: "Insert link", icon: ICON.link },
-    ],
-  },
-  {
-    label: "Headings",
-    tools: [
-      { id: "h2", title: "Heading 2", icon: ICON.h2 },
-      { id: "h3", title: "Heading 3", icon: ICON.h3 },
+      { id: "highlight", title: "Highlight text", icon: ICON.highlight },
     ],
   },
   {
     label: "Blocks",
     tools: [
-      { id: "quote", title: "Block quote", icon: ICON.quote },
-      { id: "pullquote", title: "Pull quote", icon: ICON.pullquote },
-      { id: "callout", title: "Important callout", icon: ICON.callout },
       { id: "ul", title: "Bullet list", icon: ICON.ul },
       { id: "ol", title: "Numbered list", icon: ICON.ol },
       { id: "hr", title: "Divider", icon: ICON.hr },
       { id: "code", title: "Code block", icon: ICON.code },
     ],
   },
-  {
-    label: "Media",
-    tools: [{ id: "image", title: "Upload image", icon: ICON.image }],
-  },
 ];
+
+const VISUAL_COMMANDS = new Set<ToolId>([
+  "bold",
+  "italic",
+  "highlight",
+  "ul",
+  "ol",
+  "link",
+  "hr",
+]);
 
 function wrapSelection(
   textarea: HTMLTextAreaElement,
@@ -149,15 +175,34 @@ function prefixLines(
   return { next, cursor: start + inserted.length };
 }
 
-export default function ContentEditor({
+export default forwardRef<ContentEditorHandle, ContentEditorProps>(function ContentEditor(
+  {
   value,
   onChange,
   variant = "default",
   wordCount = 0,
-}: ContentEditorProps) {
+}: ContentEditorProps,
+  ref
+) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const visualRef = useRef<VisualEditorHandle>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [blockModalTab, setBlockModalTab] = useState<"table" | "faq" | "image" | "html" | null>(null);
+  const [editorMode, setEditorMode] = useState<EditorMode>("visual");
+  const [blockFormat, setBlockFormat] = useState<BlockFormat>("paragraph");
+
+  useImperativeHandle(ref, () => ({
+    flushValue: () => {
+      if (editorMode === "visual") {
+        const html = visualRef.current?.getHtml() ?? value;
+        onChange(html);
+        return html;
+      }
+      return value;
+    },
+  }));
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current;
@@ -167,8 +212,8 @@ export default function ContentEditor({
   }, [variant]);
 
   useEffect(() => {
-    autoResize();
-  }, [value, autoResize]);
+    if (editorMode === "text") autoResize();
+  }, [value, editorMode, autoResize]);
 
   function applyEdit(result: { next: string; cursor: number }) {
     onChange(result.next);
@@ -182,6 +227,11 @@ export default function ContentEditor({
   }
 
   function insertAtCursor(text: string) {
+    if (editorMode === "visual") {
+      visualRef.current?.insertHtml(text);
+      return;
+    }
+
     const el = textareaRef.current;
     if (!el) {
       onChange(value + text);
@@ -192,7 +242,121 @@ export default function ContentEditor({
     applyEdit({ next, cursor: start + text.length });
   }
 
+  async function uploadImageFile(file: File): Promise<string | null> {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      return data.url as string;
+    } catch {
+      alert("Image upload failed. Try again.");
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function switchMode(next: EditorMode) {
+    if (next === editorMode) return;
+
+    if (editorMode === "visual") {
+      const html = visualRef.current?.getHtml();
+      if (html !== undefined) onChange(html);
+    }
+
+    setEditorMode(next);
+
+    if (next === "visual") {
+      requestAnimationFrame(() => visualRef.current?.focus());
+    } else {
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+  }
+
+  function applyTextFormat(format: BlockFormat) {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = el.value.slice(start, end) || "Your text here";
+    let wrapped = selected;
+
+    switch (format) {
+      case "paragraph":
+        wrapped = selected
+          .replace(/^#{1,6}\s+/gm, "")
+          .replace(/^>\s+/gm, "")
+          .replace(/<\/?blockquote[^>]*>/gi, "")
+          .replace(/<\/?mark[^>]*>/gi, "");
+        break;
+      case "h2":
+        wrapped = `## ${selected.replace(/^#{1,6}\s+/gm, "")}`;
+        break;
+      case "h3":
+        wrapped = `### ${selected.replace(/^#{1,6}\s+/gm, "")}`;
+        break;
+      case "quote":
+        wrapped = `<blockquote class="blog-quote">\n\n${selected}\n\n</blockquote>`;
+        break;
+      case "pullquote":
+        wrapped = `<blockquote class="pull-quote">\n\n${selected}\n\n</blockquote>`;
+        break;
+      case "callout":
+        wrapped = `<blockquote class="callout">\n\n<strong>Important:</strong> ${selected}\n\n</blockquote>`;
+        break;
+      default:
+        break;
+    }
+
+    applyEdit({ next: el.value.slice(0, start) + wrapped + el.value.slice(end), cursor: start + wrapped.length });
+  }
+
+  function handleFormatChange(format: BlockFormat) {
+    setBlockFormat(format);
+    if (editorMode === "visual") {
+      visualRef.current?.applyFormat(format);
+      return;
+    }
+    applyTextFormat(format);
+  }
+
   function handleTool(id: ToolId) {
+    switch (id) {
+      case "blocks":
+        setBlockModalTab(null);
+        setBlockModalOpen(true);
+        return;
+      case "table":
+        setBlockModalTab("table");
+        setBlockModalOpen(true);
+        return;
+      case "faq":
+        setBlockModalTab("faq");
+        setBlockModalOpen(true);
+        return;
+      case "html":
+        setBlockModalTab("html");
+        setBlockModalOpen(true);
+        return;
+      case "image":
+        imageInputRef.current?.click();
+        return;
+      default:
+        break;
+    }
+
+    if (editorMode === "visual" && VISUAL_COMMANDS.has(id)) {
+      visualRef.current?.exec(id as VisualCommand);
+      return;
+    }
+
     const el = textareaRef.current;
     if (!el) return;
 
@@ -203,35 +367,18 @@ export default function ContentEditor({
       case "italic":
         applyEdit(wrapSelection(el, "*", "*", "italic text"));
         break;
-      case "h2":
-        applyEdit(prefixLines(el, "## ", "Section heading"));
+      case "highlight": {
+        const start = el.selectionStart;
+        const end = el.selectionEnd;
+        const selected = el.value.slice(start, end) || "highlighted text";
+        const hasMark = /<mark[\s>]/i.test(selected);
+        const replacement = hasMark
+          ? selected.replace(/<mark[^>]*>/gi, "").replace(/<\/mark>/gi, "")
+          : `<mark class="blog-highlight">${selected}</mark>`;
+        const next = el.value.slice(0, start) + replacement + el.value.slice(end);
+        applyEdit({ next, cursor: start + replacement.length });
         break;
-      case "h3":
-        applyEdit(prefixLines(el, "### ", "Subheading"));
-        break;
-      case "quote":
-        applyEdit(prefixLines(el, "> ", "Quote text"));
-        break;
-      case "pullquote":
-        applyEdit(
-          wrapSelection(
-            el,
-            '<blockquote class="pull-quote">\n\n',
-            "\n\n</blockquote>",
-            "Pull quote — key takeaway"
-          )
-        );
-        break;
-      case "callout":
-        applyEdit(
-          wrapSelection(
-            el,
-            '<blockquote class="callout">\n\n<strong>Important:</strong> ',
-            "\n\n</blockquote>",
-            "key information"
-          )
-        );
-        break;
+      }
       case "ul":
         applyEdit(prefixLines(el, "- ", "List item"));
         break;
@@ -244,9 +391,6 @@ export default function ContentEditor({
         applyEdit(wrapSelection(el, "[", `](${url})`, "link text"));
         break;
       }
-      case "image":
-        imageInputRef.current?.click();
-        break;
       case "hr":
         insertAtCursor("\n\n---\n\n");
         break;
@@ -257,30 +401,100 @@ export default function ContentEditor({
   }
 
   async function handleImageUpload(file: File) {
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/admin/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
-      const alt = prompt("Image description (alt text)", "Illustration") || "Image";
-      insertAtCursor(`\n\n![${alt}](${data.url})\n\n`);
-    } catch {
-      alert("Image upload failed. Try again.");
-    } finally {
-      setUploading(false);
+    const url = await uploadImageFile(file);
+    if (!url) return;
+    const alt = prompt("Image description (alt text)", "Illustration") || "Image";
+
+    if (editorMode === "visual") {
+      visualRef.current?.insertHtml(
+        `<figure class="blog-image"><img src="${url}" alt="${alt}" loading="lazy" /><figcaption>${alt}</figcaption></figure>`
+      );
+      return;
     }
+
+    insertAtCursor(`\n\n![${alt}](${url})\n\n`);
+  }
+
+  function handleQuickInsert(html: string) {
+    insertAtCursor(`\n\n${html.trim()}\n\n`);
+  }
+
+  function handleTextPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const html = getClipboardHtml(event.clipboardData);
+    if (!html) return;
+
+    const converted = convertPastedHtmlToContent(html);
+    if (!converted) return;
+
+    event.preventDefault();
+    const el = textareaRef.current;
+    if (!el) {
+      onChange(value ? `${value}\n\n${converted}` : converted);
+      return;
+    }
+
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const before = value.slice(0, start);
+    const after = value.slice(end);
+    const spacerBefore = before && !before.endsWith("\n\n") ? "\n\n" : "";
+    const spacerAfter = after && !after.startsWith("\n") ? "\n\n" : "";
+    const insert = `${spacerBefore}${converted}${spacerAfter}`;
+    applyEdit({ next: before + insert + after, cursor: before.length + insert.length });
   }
 
   const isCanvas = variant === "canvas";
 
   return (
     <div className={`content-editor ${isCanvas ? "content-editor--canvas" : ""}`}>
+      <div className="content-editor__mode-bar">
+        <div className="content-editor__mode-tabs" role="tablist" aria-label="Editor mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={editorMode === "visual"}
+            className={`content-editor__mode-tab ${editorMode === "visual" ? "content-editor__mode-tab--active" : ""}`}
+            onClick={() => switchMode("visual")}
+          >
+            Visual
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={editorMode === "text"}
+            className={`content-editor__mode-tab ${editorMode === "text" ? "content-editor__mode-tab--active" : ""}`}
+            onClick={() => switchMode("text")}
+          >
+            Text
+          </button>
+        </div>
+        <p className="content-editor__mode-hint">
+          {editorMode === "visual"
+            ? "Select text → use Format dropdown for Paragraph, Heading, Quote."
+            : "HTML / markdown source code."}
+        </p>
+      </div>
+
       <div className="content-editor__toolbar" role="toolbar" aria-label="Formatting">
+        <div className="content-editor__group content-editor__group--format">
+          <label className="content-editor__format-label" htmlFor="editor-format-select">
+            Format
+          </label>
+          <select
+            id="editor-format-select"
+            className="content-editor__format-select"
+            value={blockFormat}
+            onChange={(e) => handleFormatChange(e.target.value as BlockFormat)}
+            title="Change block type — Paragraph, Heading, Quote, etc."
+          >
+            {FORMAT_OPTIONS.map((format) => (
+              <option key={format} value={format}>
+                {BLOCK_FORMAT_LABELS[format]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <span className="content-editor__divider" aria-hidden />
         {TOOL_GROUPS.map((group, gi) => (
           <div key={group.label} className="content-editor__group">
             {gi > 0 && <span className="content-editor__divider" aria-hidden />}
@@ -288,9 +502,12 @@ export default function ContentEditor({
               <button
                 key={tool.id}
                 type="button"
-                className="content-editor__tool"
+                className={`content-editor__tool ${tool.wide ? "content-editor__tool--wide" : ""} ${
+                  tool.id === "blocks" ? "content-editor__tool--primary" : ""
+                }`}
                 title={tool.title}
                 aria-label={tool.title}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => handleTool(tool.id)}
                 disabled={uploading && tool.id === "image"}
               >
@@ -301,25 +518,35 @@ export default function ContentEditor({
         ))}
       </div>
 
-      <textarea
-        ref={textareaRef}
-        className="content-editor__area"
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          autoResize();
-        }}
-        placeholder={
-          isCanvas
-            ? "Tell your story…"
-            : "Start writing… Use the toolbar for headings, quotes, lists, and images."
-        }
-        rows={1}
-      />
+      <div className="content-editor__workspace">
+        {editorMode === "visual" ? (
+          <VisualEditor
+            ref={visualRef}
+            source={value}
+            onChange={onChange}
+            onFormatChange={setBlockFormat}
+          />
+        ) : (
+          <textarea
+            ref={textareaRef}
+            className="content-editor__area content-editor__area--text"
+            value={value}
+            onChange={(e) => {
+              onChange(e.target.value);
+              autoResize();
+            }}
+            onPaste={handleTextPaste}
+            placeholder="HTML / markdown source — switch to Visual to see formatted content."
+            rows={1}
+            spellCheck={false}
+          />
+        )}
+      </div>
 
       {isCanvas && (
         <footer className="content-editor__footer">
           <span>{wordCount} words</span>
+          <span>{editorMode === "visual" ? "Visual editor" : "Text editor"}</span>
           {uploading && <span>Uploading image…</span>}
         </footer>
       )}
@@ -335,6 +562,17 @@ export default function ContentEditor({
           e.target.value = "";
         }}
       />
+
+      <BlockInserterModal
+        open={blockModalOpen}
+        initialTab={blockModalTab ?? "table"}
+        onClose={() => {
+          setBlockModalOpen(false);
+          setBlockModalTab(null);
+        }}
+        onInsert={handleQuickInsert}
+        onUploadImage={uploadImageFile}
+      />
     </div>
   );
-}
+});

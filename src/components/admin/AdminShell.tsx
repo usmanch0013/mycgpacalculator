@@ -13,9 +13,9 @@ const NAV = [
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLogin = pathname === "/admin/login";
+  const isBarePage = pathname === "/admin/login" || pathname === "/admin/preview";
 
-  if (isLogin) {
+  if (isBarePage) {
     return <>{children}</>;
   }
 

@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ArticleTitleField from "@/components/admin/ArticleTitleField";
-import ContentEditor from "@/components/admin/ContentEditor";
+import ContentEditor, { type ContentEditorHandle } from "@/components/admin/ContentEditor";
 import PostSettingsPanel from "@/components/admin/PostSettingsPanel";
 import RankMathSeoPanel, { scoreColor, useSeoScore } from "@/components/admin/RankMathSeoPanel";
 import SerpPreview from "@/components/admin/SerpPreview";
 import SnippetEditorModal from "@/components/admin/SnippetEditorModal";
 import { getPostPath } from "@/lib/blog/paths";
+import { saveArticlePreview } from "@/lib/blog/preview";
 import { generateSlug } from "@/lib/blog/utils";
 import type { BlogPost, PostStatus } from "@/lib/blog/types";
 
@@ -30,8 +31,22 @@ const EMPTY = {
   featuredImage: "",
 };
 
+type SaveStatus = "idle" | "saving" | "saved" | "error";
+
+function hasDraftContent(form: typeof EMPTY) {
+  return Boolean(
+    form.title.trim() ||
+      form.content.replace(/<[^>]*>/g, "").trim() ||
+      form.excerpt.trim() ||
+      form.featuredImage.trim() ||
+      form.focusKeyword.trim() ||
+      form.metaDescription.trim()
+  );
+}
+
 export default function PostEditor({ post, mode }: PostEditorProps) {
   const router = useRouter();
+  const contentEditorRef = useRef<ContentEditorHandle>(null);
   const [form, setForm] = useState({
     title: post?.title ?? EMPTY.title,
     slug: post?.slug ?? EMPTY.slug,
@@ -43,11 +58,33 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
     author: post?.author ?? EMPTY.author,
     featuredImage: post?.featuredImage ?? EMPTY.featuredImage,
   });
+  const [postId, setPostId] = useState(post?.id ?? null);
   const [slugManual, setSlugManual] = useState(Boolean(post?.slug));
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [error, setError] = useState("");
   const [sidebarTab, setSidebarTab] = useState<"post" | "seo">("post");
   const [snippetOpen, setSnippetOpen] = useState(false);
+  const formRef = useRef(form);
+  const postIdRef = useRef(postId);
+  const savingRef = useRef(false);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedPayload = useRef(
+    JSON.stringify({
+      title: post?.title ?? EMPTY.title,
+      slug: post?.slug ?? EMPTY.slug,
+      focusKeyword: post?.focusKeyword ?? EMPTY.focusKeyword,
+      metaDescription: post?.metaDescription ?? EMPTY.metaDescription,
+      excerpt: post?.excerpt ?? EMPTY.excerpt,
+      content: post?.content ?? EMPTY.content,
+      status: post?.status ?? EMPTY.status,
+      author: post?.author ?? EMPTY.author,
+      featuredImage: post?.featuredImage ?? EMPTY.featuredImage,
+    })
+  );
+
+  formRef.current = form;
+  postIdRef.current = postId;
 
   const seoProps = {
     title: form.title,
@@ -71,44 +108,119 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
     });
   }
 
-  async function handleSave(publishNow = false) {
-    setSaving(true);
-    setError("");
+  const persistDraft = useCallback(async (opts?: { silent?: boolean; publish?: boolean }) => {
+    while (savingRef.current) {
+      await new Promise((resolve) => window.setTimeout(resolve, 40));
+    }
+
+    const latestContent = contentEditorRef.current?.flushValue() ?? formRef.current.content;
     const payload = {
-      ...form,
-      status: publishNow ? "published" : form.status,
-    } as typeof form;
+      ...formRef.current,
+      content: latestContent,
+      status: (opts?.publish ? "published" : formRef.current.status) as PostStatus,
+    };
+
+    if (!postIdRef.current && !hasDraftContent(payload) && !opts?.publish) {
+      return null;
+    }
+
+    const serialized = JSON.stringify(payload);
+    if (serialized === lastSavedPayload.current && postIdRef.current && !opts?.publish) {
+      return { id: postIdRef.current } as BlogPost;
+    }
+
+    savingRef.current = true;
+    if (!opts?.silent) setSaving(true);
+    setSaveStatus("saving");
+    setError("");
 
     try {
-      const url =
-        mode === "create"
-          ? "/api/admin/posts"
-          : `/api/admin/posts/${post!.id}`;
-      const method = mode === "create" ? "POST" : "PUT";
-
+      const existingId = postIdRef.current;
+      const url = existingId ? `/api/admin/posts/${existingId}` : "/api/admin/posts";
+      const method = existingId ? "PUT" : "POST";
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Save failed");
 
+      setPostId(data.id);
+      lastSavedPayload.current = JSON.stringify({ ...payload, slug: data.slug, status: data.status });
+      if (data.slug && data.slug !== formRef.current.slug) {
+        setForm((prev) => ({ ...prev, slug: data.slug, content: latestContent }));
+      } else if (latestContent !== formRef.current.content) {
+        setForm((prev) => ({ ...prev, content: latestContent }));
+      }
+      if (opts?.publish) {
+        setForm((prev) => ({ ...prev, status: "published" }));
+      }
+
+      setSaveStatus("saved");
+      if (!existingId) {
+        window.history.replaceState(null, "", `/admin/posts/${data.id}/edit`);
+      }
+      return data as BlogPost;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Save failed";
+      setError(message);
+      setSaveStatus("error");
+      return null;
+    } finally {
+      savingRef.current = false;
+      if (!opts?.silent) setSaving(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = window.setTimeout(() => {
+      void persistDraft({ silent: true });
+    }, 1400);
+    return () => {
+      if (autosaveTimer.current) window.clearTimeout(autosaveTimer.current);
+    };
+  }, [form, persistDraft]);
+
+  async function handleSave(publishNow = false) {
+    const saved = await persistDraft({ publish: publishNow });
+    if (!saved) return;
+    if (publishNow) {
       router.push("/admin");
       router.refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
-    } finally {
-      setSaving(false);
     }
   }
 
+  async function goBack() {
+    await persistDraft({ silent: true });
+    router.push("/admin");
+    router.refresh();
+  }
+
+  function openPreview() {
+    const latestContent = contentEditorRef.current?.flushValue() ?? form.content;
+    if (latestContent !== form.content) {
+      update("content", latestContent);
+    }
+
+    saveArticlePreview({
+      title: form.title,
+      slug: form.slug,
+      content: latestContent,
+      excerpt: form.excerpt,
+      author: form.author,
+      featuredImage: form.featuredImage,
+    });
+
+    window.open("/admin/preview", "_blank", "noopener,noreferrer");
+  }
+
   async function handleDelete() {
-    if (!post || !confirm("Delete this post permanently?")) return;
+    if (!postId || !confirm("Delete this post permanently?")) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/posts/${post.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/posts/${postId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
       router.push("/admin");
       router.refresh();
@@ -122,12 +234,26 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
     <div className="wp-editor">
       <header className="wp-editor__bar">
         <div className="wp-editor__bar-left">
-          <Link href="/admin" className="wp-editor__back" aria-label="Back to dashboard">
+          <button
+            type="button"
+            className="wp-editor__back"
+            aria-label="Back to dashboard"
+            onClick={goBack}
+          >
             ←
-          </Link>
+          </button>
           <span className="wp-editor__bar-title">
             {form.title.trim() || "Untitled"}
           </span>
+          {saveStatus !== "idle" && (
+            <span
+              className={`wp-editor__save-status${saveStatus === "error" ? " wp-editor__save-status--error" : ""}`}
+            >
+              {saveStatus === "saving" && "Saving…"}
+              {saveStatus === "saved" && (form.status === "published" ? "Saved" : "Draft saved")}
+              {saveStatus === "error" && "Save failed"}
+            </span>
+          )}
         </div>
 
         <div className="wp-editor__bar-center">
@@ -142,16 +268,23 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
         </div>
 
         <div className="wp-editor__bar-right">
-          {mode === "edit" && post?.status === "published" && (
+          <button
+            type="button"
+            className="wp-editor__btn wp-editor__btn--ghost"
+            onClick={openPreview}
+          >
+            Preview
+          </button>
+          {form.status === "published" && form.slug && (
             <Link
               href={getPostPath(form.slug)}
               className="wp-editor__btn wp-editor__btn--ghost"
               target="_blank"
             >
-              Preview
+              View live
             </Link>
           )}
-          {mode === "edit" && (
+          {postId && (
             <button
               type="button"
               className="wp-editor__btn wp-editor__btn--ghost wp-editor__btn--danger"
@@ -175,7 +308,7 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
             onClick={() => handleSave(true)}
             disabled={saving}
           >
-            {saving ? "Saving…" : "Publish"}
+            {saving && saveStatus === "saving" && form.status === "published" ? "Saving…" : "Publish"}
           </button>
         </div>
       </header>
@@ -194,6 +327,7 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
               <div className="article-write__body">
                 <span className="article-write__body-label">Article content</span>
                 <ContentEditor
+                  ref={contentEditorRef}
                   value={form.content}
                   onChange={(v) => update("content", v)}
                   variant="canvas"
@@ -290,6 +424,7 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
         }}
         onMetaChange={(v) => update("metaDescription", v)}
       />
+
     </div>
   );
 }

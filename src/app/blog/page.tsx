@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import { getPostPath } from "@/lib/blog/paths";
 import { getPublishedPosts } from "@/lib/blog/storage";
 import { BLOG_CONFIG } from "@/lib/blog/config";
+import "@/styles/blog-public.css";
 
 export const metadata: Metadata = {
   title: "Blog — CGPA, GPA & Grading Guides",

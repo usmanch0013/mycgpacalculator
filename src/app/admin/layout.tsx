@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import AdminShell from "@/components/admin/AdminShell";
+import "@/styles/admin-panel.css";
+import "@/styles/blog-public.css";
 
 export const metadata: Metadata = {
   title: "Blog Admin",

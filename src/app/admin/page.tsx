@@ -1,17 +1,6 @@
 import Link from "next/link";
-import { getPostPath } from "@/lib/blog/paths";
+import PostsTable from "@/components/admin/PostsTable";
 import { getAllPosts } from "@/lib/blog/storage";
-import { analyzeSeo, scoreColor } from "@/lib/blog/seo-score";
-
-function SeoBadge({ score }: { score: number }) {
-  const color = scoreColor(score);
-  return (
-    <span className="admin-seo-badge" style={{ borderColor: color, color }}>
-      {score}
-      <small>/100</small>
-    </span>
-  );
-}
 
 export default async function AdminDashboardPage() {
   const posts = await getAllPosts();
@@ -106,87 +95,7 @@ export default async function AdminDashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="admin-table-wrap">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Article</th>
-                  <th>Status</th>
-                  <th>SEO</th>
-                  <th>Date</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {posts.map((post) => {
-                  const seo = analyzeSeo(
-                    post.title,
-                    post.slug,
-                    post.metaDescription,
-                    post.focusKeyword,
-                    post.content,
-                    {
-                      excerpt: post.excerpt,
-                      featuredImage: post.featuredImage,
-                    }
-                  );
-                  return (
-                    <tr key={post.id}>
-                      <td>
-                        <div className="admin-table__title-cell">
-                          {post.featuredImage && (
-                            <img
-                              src={post.featuredImage}
-                              alt=""
-                              className="admin-table__thumb"
-                            />
-                          )}
-                          <div>
-                            <strong>{post.title}</strong>
-                            <span className="admin-table__slug">{getPostPath(post.slug)}</span>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`admin-badge admin-badge--${post.status}`}>
-                          {post.status}
-                        </span>
-                      </td>
-                      <td>
-                        <SeoBadge score={seo.score} />
-                      </td>
-                      <td className="admin-table__date">
-                        {new Date(post.publishedAt).toLocaleDateString("en-US", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td>
-                        <div className="admin-table__actions">
-                          <Link
-                            href={`/admin/posts/${post.id}/edit`}
-                            className="admin-table__action"
-                          >
-                            Edit
-                          </Link>
-                          {post.status === "published" && (
-                            <Link
-                              href={getPostPath(post.slug)}
-                              className="admin-table__action"
-                              target="_blank"
-                            >
-                              View
-                            </Link>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <PostsTable posts={posts} />
         )}
       </section>
     </div>

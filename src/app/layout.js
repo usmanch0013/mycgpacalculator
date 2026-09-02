@@ -1,4 +1,5 @@
 import "./globals.css";
+import { Inter } from "next/font/google";
 import JsonLd from "@/components/JsonLd";
 import CookieConsent from "@/components/CookieConsent";
 import {
@@ -8,6 +9,13 @@ import {
   DEFAULT_OG_IMAGE,
   GLOBAL_JSON_LD,
 } from "@/lib/seo";
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata = {
   metadataBase: new URL(SITE_URL),
@@ -62,7 +70,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${inter.className} ${inter.variable}`}>
       <body>
         <JsonLd data={GLOBAL_JSON_LD} />
         {children}

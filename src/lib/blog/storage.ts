@@ -53,9 +53,20 @@ export async function getPostById(id: string): Promise<BlogPost | null> {
   return all.find((p) => p.id === id) ?? null;
 }
 
+async function uniqueDraftSlug(preferred: string): Promise<string> {
+  const base = preferred.trim() || `draft-${Date.now().toString(36)}`;
+  let slug = base;
+  let n = 2;
+  while (await getPostBySlug(slug)) {
+    slug = `${base}-${n}`;
+    n += 1;
+  }
+  return slug;
+}
+
 export async function createPost(input: BlogPostInput): Promise<BlogPost> {
   await ensureDir();
-  const slug = input.slug.trim() || generateSlug(input.title);
+  const slug = await uniqueDraftSlug(input.slug.trim() || generateSlug(input.title));
   const slugError = validatePostSlug(slug);
   if (slugError) throw new Error(slugError);
   const existing = await getPostBySlug(slug);
@@ -126,4 +137,20 @@ export async function deletePost(id: string): Promise<void> {
   const post = await getPostById(id);
   if (!post) throw new Error("Post not found.");
   await fs.unlink(postPath(post.slug));
+}
+
+export async function duplicatePost(id: string): Promise<BlogPost> {
+  const existing = await getPostById(id);
+  if (!existing) throw new Error("Post not found.");
+  return createPost({
+    title: existing.title.trim() ? `${existing.title} (Copy)` : "Untitled (Copy)",
+    slug: `${existing.slug}-copy`,
+    focusKeyword: existing.focusKeyword,
+    metaDescription: existing.metaDescription,
+    excerpt: existing.excerpt,
+    content: existing.content,
+    status: "draft",
+    author: existing.author,
+    featuredImage: existing.featuredImage,
+  });
 }
