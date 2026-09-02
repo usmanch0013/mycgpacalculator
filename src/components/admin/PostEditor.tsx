@@ -68,7 +68,7 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
   const formRef = useRef(form);
   const postIdRef = useRef(postId);
   const savingRef = useRef(false);
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveTimer = useRef<number | null>(null);
   const lastSavedPayload = useRef(
     JSON.stringify({
       title: post?.title ?? EMPTY.title,
