@@ -231,6 +231,59 @@ export function wrapRangeWithBlockquote(className: string, placeholder = "Quote 
   selection.addRange(newRange);
 }
 
+function normalizeLinkHref(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+
+  if (/^(\/|#|mailto:|tel:)/i.test(trimmed)) return trimmed;
+
+  try {
+    const parsed = new URL(trimmed, window.location.origin);
+    if (parsed.origin === window.location.origin) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+    return parsed.href;
+  } catch {
+    return trimmed.startsWith("http") ? trimmed : `/${trimmed.replace(/^\/+/, "")}`;
+  }
+}
+
+export function insertLink(rawUrl: string) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+
+  const href = normalizeLinkHref(rawUrl);
+  if (!href) return;
+
+  const range = selection.getRangeAt(0);
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  if (/^https?:\/\//i.test(href)) {
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+  }
+
+  if (range.collapsed) {
+    const label = prompt("Link text", href) || href;
+    anchor.textContent = label;
+    range.insertNode(anchor);
+  } else {
+    try {
+      anchor.appendChild(range.extractContents());
+      range.insertNode(anchor);
+    } catch {
+      document.execCommand("createLink", false, href);
+      return;
+    }
+  }
+
+  selection.removeAllRanges();
+  const newRange = document.createRange();
+  newRange.selectNodeContents(anchor);
+  newRange.collapse(false);
+  selection.addRange(newRange);
+}
+
 export function insertHtmlAtSelection(html: string) {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return;

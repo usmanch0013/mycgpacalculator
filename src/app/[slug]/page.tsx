@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BlogArticleView from "@/components/blog/BlogArticleView";
-import { getPublishedPosts, getPostBySlug } from "@/lib/blog/storage";
+import { getPostBySlug } from "@/lib/blog/storage";
 import { renderMarkdown } from "@/lib/blog/markdown";
 import { BLOG_CONFIG } from "@/lib/blog/config";
 import { getPostPath, isReservedSlug } from "@/lib/blog/paths";
@@ -12,10 +12,8 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-export async function generateStaticParams() {
-  const posts = await getPublishedPosts();
-  return posts.map((p) => ({ slug: p.slug }));
-}
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;

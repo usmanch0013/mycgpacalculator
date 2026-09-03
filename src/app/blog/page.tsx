@@ -7,6 +7,9 @@ import { getPublishedPosts } from "@/lib/blog/storage";
 import { BLOG_CONFIG } from "@/lib/blog/config";
 import "@/styles/blog-public.css";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const metadata: Metadata = {
   title: "Blog — CGPA, GPA & Grading Guides",
   description:

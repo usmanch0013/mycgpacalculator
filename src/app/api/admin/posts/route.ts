@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createPost, getAllPosts } from "@/lib/blog/storage";
+import { revalidateBlogPaths } from "@/lib/blog/revalidate";
 import type { BlogPostInput } from "@/lib/blog/types";
 
 export async function GET() {
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as BlogPostInput;
     const post = await createPost(body);
+    revalidateBlogPaths(post.status === "published" ? post.slug : undefined);
     return NextResponse.json(post, { status: 201 });
   } catch (e) {
     return NextResponse.json(

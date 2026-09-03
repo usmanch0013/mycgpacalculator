@@ -499,6 +499,12 @@
   font-weight: 500;
 }
 
+.blog-article__prose blockquote.callout a {
+  color: var(--forest-700);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .blog-article__footer {
   margin: 0;
   padding: 1.35rem 2.75rem 2rem;

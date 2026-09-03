@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deletePost, duplicatePost, updatePost } from "@/lib/blog/storage";
+import { revalidateBlogPaths } from "@/lib/blog/revalidate";
 
 type BulkAction = "delete" | "publish" | "draft" | "duplicate";
 
@@ -13,17 +14,20 @@ export async function POST(request: Request) {
 
     if (body.action === "delete") {
       for (const id of ids) await deletePost(id);
+      revalidateBlogPaths();
       return NextResponse.json({ ok: true, count: ids.length });
     }
 
     if (body.action === "publish" || body.action === "draft") {
       for (const id of ids) await updatePost(id, { status: body.action === "publish" ? "published" : "draft" });
+      revalidateBlogPaths();
       return NextResponse.json({ ok: true, count: ids.length });
     }
 
     if (body.action === "duplicate") {
       const created = [];
       for (const id of ids) created.push(await duplicatePost(id));
+      revalidateBlogPaths();
       return NextResponse.json({ ok: true, count: created.length, posts: created });
     }
 

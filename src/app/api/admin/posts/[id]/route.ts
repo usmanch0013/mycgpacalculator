@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deletePost, getPostById, updatePost } from "@/lib/blog/storage";
+import { revalidateBlogPaths } from "@/lib/blog/revalidate";
 import type { BlogPostInput } from "@/lib/blog/types";
 
 interface RouteParams {
@@ -23,8 +24,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
+    const existing = await getPostById(id);
     const body = (await request.json()) as Partial<BlogPostInput>;
     const post = await updatePost(id, body);
+    revalidateBlogPaths(post.slug, existing?.slug);
     return NextResponse.json(post);
   } catch (e) {
     return NextResponse.json(
@@ -37,7 +40,9 @@ export async function PUT(request: Request, { params }: RouteParams) {
 export async function DELETE(_request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
+    const existing = await getPostById(id);
     await deletePost(id);
+    revalidateBlogPaths(existing?.slug);
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(

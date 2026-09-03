@@ -11,6 +11,7 @@ import { convertPastedHtmlToContent, getClipboardHtml } from "@/lib/blog/paste-h
 import {
   applyBlockFormat,
   detectBlockFormat,
+  insertLink,
   insertHtmlAtSelection,
   sourceToVisualHtml,
   toggleHighlight,
@@ -116,9 +117,9 @@ const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(function 
         toggleList(true, el);
         break;
       case "link": {
-        const url = prompt("Link URL (e.g. /universities)", "/universities");
+        const url = prompt("Link URL (e.g. /calculator/iub)", "/calculator/iub");
         if (!url) return;
-        document.execCommand("createLink", false, url);
+        insertLink(url);
         break;
       }
       case "hr":

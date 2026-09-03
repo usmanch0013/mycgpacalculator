@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { duplicatePost } from "@/lib/blog/storage";
+import { revalidateBlogPaths } from "@/lib/blog/revalidate";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -9,6 +10,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
     const post = await duplicatePost(id);
+    revalidateBlogPaths();
     return NextResponse.json(post, { status: 201 });
   } catch (e) {
     return NextResponse.json(
