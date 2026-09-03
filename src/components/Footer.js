@@ -27,6 +27,7 @@ export default function Footer() {
             <h4 className="footer-title">Explore</h4>
             <nav className="footer-links" aria-label="Site navigation">
               <Link href="/#calculator">CGPA Calculator</Link>
+              <Link href="/blog">Blog &amp; guides</Link>
               <Link href="/#guide">How it works</Link>
               <Link href="/universities">All universities</Link>
               <Link href="/about">About</Link>

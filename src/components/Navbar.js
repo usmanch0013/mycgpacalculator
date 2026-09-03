@@ -11,6 +11,7 @@ export default function Navbar() {
         <nav className="nav-links" aria-label="Main navigation">
           <a href="/#calculator">Calculator</a>
           <a href="/universities">Universities</a>
+          <a href="/blog">Blog</a>
           <a href="/universities/uk-europe">UK &amp; Europe</a>
           <a href="/about">About</a>
           <a href="/#faq">FAQ</a>
