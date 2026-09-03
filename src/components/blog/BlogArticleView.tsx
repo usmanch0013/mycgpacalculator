@@ -2,6 +2,7 @@ import Link from "next/link";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { estimateReadingTime } from "@/lib/blog/markdown";
 import { analyzeSeo } from "@/lib/blog/seo-score";
+import { getPostPath } from "@/lib/blog/paths";
 import "@/styles/blog-public.css";
 
 interface BlogArticleViewProps {
@@ -13,6 +14,15 @@ interface BlogArticleViewProps {
   html: string;
   content: string;
   publishedAt: string;
+}
+
+function authorInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "CP";
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 export default function BlogArticleView({
@@ -31,38 +41,64 @@ export default function BlogArticleView({
   });
   const readingMin = estimateReadingTime(seo.wordCount);
   const displayTitle = title.trim() || "Untitled article";
+  const displayAuthor = author.trim() || "CGPA Calculator Pro";
+  const formattedDate = new Date(publishedAt).toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   return (
     <main id="main-content" className="blog-article">
-      <div className="container" style={{ paddingTop: "1.5rem" }}>
-        <Breadcrumbs
-          items={[
-            { href: "/", label: "Home" },
-            { href: "/blog", label: "Blog" },
-            { label: displayTitle },
-          ]}
-        />
+      <div className="blog-article__topbar">
+        <div className="container blog-article__topbar-inner">
+          <Breadcrumbs
+            items={[
+              { href: "/", label: "Home" },
+              { href: "/blog", label: "Blog" },
+              { label: displayTitle },
+            ]}
+          />
+          <Link href="/blog" className="blog-article__back">
+            ← All articles
+          </Link>
+        </div>
       </div>
 
-      <header className="blog-article__header">
-        <div className="container">
-          {featuredImage && (
-            <div className="blog-article__hero-image">
-              <img src={featuredImage} alt={displayTitle} width={1200} height={630} />
-            </div>
-          )}
-          <time className="blog-article__date" dateTime={publishedAt}>
-            {new Date(publishedAt).toLocaleDateString("en-US", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-          </time>
+      <header className={`blog-article__hero${featuredImage ? " blog-article__hero--image" : ""}`}>
+        {featuredImage && (
+          <div className="blog-article__hero-media" aria-hidden="true">
+            <img src={featuredImage} alt="" />
+            <span className="blog-article__hero-overlay" />
+          </div>
+        )}
+
+        <div className="container blog-article__hero-content">
+          <span className="blog-article__kicker">CGPA &amp; GPA Guide</span>
           <h1 className="blog-article__title">{displayTitle}</h1>
-          <p className="blog-article__meta">
-            By {author || "CGPA Calculator Pro"} · {readingMin} min read
-          </p>
+
           {excerpt.trim() && <p className="blog-article__excerpt">{excerpt}</p>}
+
+          <div className="blog-article__meta-bar">
+            <div className="blog-article__author">
+              <span className="blog-article__avatar" aria-hidden="true">
+                {authorInitials(displayAuthor)}
+              </span>
+              <div>
+                <strong>{displayAuthor}</strong>
+                <time dateTime={publishedAt}>{formattedDate}</time>
+              </div>
+            </div>
+
+            <div className="blog-article__stats">
+              <span className="blog-article__stat">
+                <strong>{readingMin}</strong> min read
+              </span>
+              <span className="blog-article__stat">
+                <strong>{seo.wordCount.toLocaleString()}</strong> words
+              </span>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -74,14 +110,41 @@ export default function BlogArticleView({
               __html: html || "<p>Start writing to see your article preview.</p>",
             }}
           />
-
-          <footer className="blog-article__footer">
-            <p>
-              Use our <Link href="/">free CGPA calculator</Link> or browse{" "}
-              <Link href="/universities">university grading guides</Link>.
-            </p>
-          </footer>
         </article>
+
+        <aside className="blog-article__cta-grid" aria-label="Helpful tools">
+          <Link href="/" className="blog-article__cta-card blog-article__cta-card--primary">
+            <span className="blog-article__cta-label">Free tool</span>
+            <strong>Calculate your CGPA</strong>
+            <span className="blog-article__cta-arrow">Open calculator →</span>
+          </Link>
+          <Link href="/universities" className="blog-article__cta-card">
+            <span className="blog-article__cta-label">60+ scales</span>
+            <strong>University grading guides</strong>
+            <span className="blog-article__cta-arrow">Browse universities →</span>
+          </Link>
+          <Link href="/universities/bangladesh" className="blog-article__cta-card">
+            <span className="blog-article__cta-label">Regional</span>
+            <strong>Bangladesh university guides</strong>
+            <span className="blog-article__cta-arrow">Browse guides →</span>
+          </Link>
+        </aside>
+
+        <footer className="blog-article__footer">
+          <p>
+            Published on <time dateTime={publishedAt}>{formattedDate}</time>
+            {slug ? (
+              <>
+                {" "}
+                · Permalink:{" "}
+                <Link href={getPostPath(slug)}>{getPostPath(slug)}</Link>
+              </>
+            ) : null}
+          </p>
+          <Link href="/blog" className="blog-article__footer-link">
+            ← Back to all articles
+          </Link>
+        </footer>
       </div>
     </main>
   );
