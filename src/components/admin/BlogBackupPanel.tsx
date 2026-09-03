@@ -27,7 +27,7 @@ export default function BlogBackupPanel() {
       anchor.download = `cgpa-blog-backup-${stamp}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
-      setMessage("Backup downloaded. Keep this file safe before every redeploy.");
+      setMessage("Backup downloaded. Keep this file as an extra safety copy.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Backup failed");
     } finally {
@@ -74,19 +74,13 @@ export default function BlogBackupPanel() {
     <section className="admin-backup">
       <div className="admin-backup__head">
         <div>
-          <h2 className="admin-backup__title">Article backup (deploy safe)</h2>
+          <h2 className="admin-backup__title">Article backup</h2>
           <p className="admin-backup__desc">
-            Hostinger redeploy can wipe saved articles. Download a backup before deploy, then restore
-            after deploy if anything disappears.
+            Articles sync to GitHub automatically when configured. You can also download a JSON
+            backup anytime, or restore from a saved file if anything goes missing.
           </p>
         </div>
       </div>
-
-      <ol className="admin-backup__steps">
-        <li>Before deploy → <strong>Download backup</strong></li>
-        <li>Run your normal Hostinger redeploy</li>
-        <li>After deploy → <strong>Restore backup</strong> if articles are missing</li>
-      </ol>
 
       <div className="admin-backup__actions">
         <button

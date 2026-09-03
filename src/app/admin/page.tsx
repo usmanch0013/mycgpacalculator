@@ -32,7 +32,8 @@ export default async function AdminDashboardPage() {
           <ul>
             <li>Set a focus keyword before writing</li>
             <li>Upload a featured image for every post</li>
-            <li>Before redeploy, download an article backup</li>
+            <li>Articles and images save automatically to GitHub</li>
+            <li>Download a JSON backup anytime for extra safety</li>
           </ul>
         </div>
       </section>

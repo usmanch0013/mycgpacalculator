@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deletePost, duplicatePost, updatePost } from "@/lib/blog/storage";
+import { safeFlushGitSyncQueue } from "@/lib/blog/github-sync";
 import { revalidateBlogPaths } from "@/lib/blog/revalidate";
 
 type BulkAction = "delete" | "publish" | "draft" | "duplicate";
@@ -14,12 +15,14 @@ export async function POST(request: Request) {
 
     if (body.action === "delete") {
       for (const id of ids) await deletePost(id);
+      await safeFlushGitSyncQueue();
       revalidateBlogPaths();
       return NextResponse.json({ ok: true, count: ids.length });
     }
 
     if (body.action === "publish" || body.action === "draft") {
       for (const id of ids) await updatePost(id, { status: body.action === "publish" ? "published" : "draft" });
+      await safeFlushGitSyncQueue();
       revalidateBlogPaths();
       return NextResponse.json({ ok: true, count: ids.length });
     }
@@ -27,6 +30,7 @@ export async function POST(request: Request) {
     if (body.action === "duplicate") {
       const created = [];
       for (const id of ids) created.push(await duplicatePost(id));
+      await safeFlushGitSyncQueue();
       revalidateBlogPaths();
       return NextResponse.json({ ok: true, count: created.length, posts: created });
     }

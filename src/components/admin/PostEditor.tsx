@@ -108,7 +108,7 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
     });
   }
 
-  const persistDraft = useCallback(async (opts?: { silent?: boolean; publish?: boolean }) => {
+  const persistDraft = useCallback(async (opts?: { silent?: boolean; publish?: boolean; syncGit?: boolean }) => {
     while (savingRef.current) {
       await new Promise((resolve) => window.setTimeout(resolve, 40));
     }
@@ -141,7 +141,10 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          syncGit: opts?.syncGit ?? Boolean(opts?.publish || !opts?.silent),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Save failed");
@@ -193,7 +196,7 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
   }
 
   async function goBack() {
-    await persistDraft({ silent: true });
+    await persistDraft({ silent: true, syncGit: true });
     router.push("/admin");
     router.refresh();
   }

@@ -1,10 +1,12 @@
 import { GRADING_SYSTEMS } from './gradingSystems';
+import { getCountryHubLink } from './internalLinks';
 import {
   getUniversityKeywordTitle,
   getUniversityKeywordDescription,
   getUniversityKeywordH1,
   getUniversityKeywordList,
 } from './keywordSeo';
+import { getUniversityContentOverride } from './universityContentOverrides';
 
 const PERCENTAGE_FORMULAS = {
   Bangladesh: 'A rough guide used by many colleges: multiply CGPA by 25. Your faculty may use something different — check your handbook.',
@@ -81,13 +83,26 @@ export function getUniversitySeoContent(uni) {
   const system = GRADING_SYSTEMS[uni.system];
   const scale = system?.scale ?? '4.0';
   const pctFormula = PERCENTAGE_FORMULAS[uni.country] ?? 'Check your university handbook for the official conversion rule.';
+  const override = getUniversityContentOverride(uni.slug);
 
-  return {
+  const base = {
     intro: buildIntro(uni, system, scale),
     howTo: buildHowTo(uni, scale),
     gradingNote: buildGradingNote(uni, system),
     percentageNote: pctFormula,
     faqs: getUniversityFaqs(uni, system, pctFormula),
+  };
+
+  if (!override) return base;
+
+  return {
+    ...base,
+    intro: override.intro ?? base.intro,
+    context: override.context,
+    howTo: override.howTo ?? base.howTo,
+    gradingNote: override.gradingNote ?? base.gradingNote,
+    percentageNote: override.percentageNote ?? base.percentageNote,
+    faqs: override.faqs ?? base.faqs,
   };
 }
 
@@ -137,4 +152,21 @@ export function getRelatedUniversities(uni, allUniversities, limit = 6) {
       return true;
     })
     .slice(0, limit);
+}
+
+/** Short contextual blurb with internal links — unique per university via desc + related list. */
+export function getUniversityGuideLinks(uni, related = []) {
+  const peers = related.slice(0, 3).map((r) => ({
+    href: `/calculator/${r.slug}`,
+    label: `${r.shortName} CGPA calculator`,
+  }));
+
+  return {
+    countryHub: getCountryHubLink(uni.country),
+    peers,
+    formulaHref: '/#formula',
+    guideHref: '/#guide',
+    blogHref: '/blog',
+    directoryHref: '/universities',
+  };
 }

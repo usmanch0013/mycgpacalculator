@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { generateSlug } from "./utils";
 import { validatePostSlug } from "./paths";
+import { blogRelativePath, queueGitDelete, queueGitUpsert } from "./github-sync";
 import type { BlogPost, BlogPostInput } from "./types";
 
 const BLOG_DIR = path.join(process.cwd(), "content/blog");
@@ -91,6 +92,7 @@ export async function createPost(input: BlogPostInput): Promise<BlogPost> {
   };
 
   await fs.writeFile(postPath(slug), JSON.stringify(post, null, 2), "utf8");
+  queueGitUpsert(blogRelativePath(postPath(slug)), postPath(slug));
   return post;
 }
 
@@ -109,6 +111,7 @@ export async function updatePost(
     if (clash && clash.id !== id) throw new Error("Slug already in use.");
     try {
       await fs.unlink(postPath(existing.slug));
+      queueGitDelete(blogRelativePath(postPath(existing.slug)));
     } catch {
       /* ok */
     }
@@ -117,19 +120,25 @@ export async function updatePost(
   const post: BlogPost = {
     ...existing,
     slug: newSlug,
-    title: input.title?.trim() ?? existing.title,
-    focusKeyword: input.focusKeyword?.trim() ?? existing.focusKeyword,
-    metaDescription: input.metaDescription?.trim() ?? existing.metaDescription,
-    excerpt: input.excerpt?.trim() ?? existing.excerpt,
-    content: input.content ?? existing.content,
-    status: input.status ?? existing.status,
-    publishedAt: input.publishedAt ?? existing.publishedAt,
+    title: input.title !== undefined ? input.title.trim() : existing.title,
+    focusKeyword:
+      input.focusKeyword !== undefined ? input.focusKeyword.trim() : existing.focusKeyword,
+    metaDescription:
+      input.metaDescription !== undefined ? input.metaDescription.trim() : existing.metaDescription,
+    excerpt: input.excerpt !== undefined ? input.excerpt.trim() : existing.excerpt,
+    content: input.content !== undefined ? input.content : existing.content,
+    status: input.status !== undefined ? input.status : existing.status,
+    publishedAt: input.publishedAt !== undefined ? input.publishedAt : existing.publishedAt,
     updatedAt: new Date().toISOString(),
-    author: input.author?.trim() ?? existing.author,
-    featuredImage: input.featuredImage?.trim() || existing.featuredImage,
+    author: input.author !== undefined ? input.author.trim() : existing.author,
+    featuredImage:
+      input.featuredImage !== undefined
+        ? input.featuredImage.trim() || undefined
+        : existing.featuredImage,
   };
 
   await fs.writeFile(postPath(newSlug), JSON.stringify(post, null, 2), "utf8");
+  queueGitUpsert(blogRelativePath(postPath(newSlug)), postPath(newSlug));
   return post;
 }
 
@@ -137,6 +146,7 @@ export async function deletePost(id: string): Promise<void> {
   const post = await getPostById(id);
   if (!post) throw new Error("Post not found.");
   await fs.unlink(postPath(post.slug));
+  queueGitDelete(blogRelativePath(postPath(post.slug)));
 }
 
 export async function duplicatePost(id: string): Promise<BlogPost> {
@@ -181,6 +191,7 @@ export async function importPosts(
     for (const post of existing) {
       try {
         await fs.unlink(postPath(post.slug));
+        queueGitDelete(blogRelativePath(postPath(post.slug)));
       } catch {
         /* ok */
       }
@@ -214,6 +225,7 @@ export async function importPosts(
       if (byId && byId.slug !== post.slug) {
         try {
           await fs.unlink(postPath(byId.slug));
+          queueGitDelete(blogRelativePath(postPath(byId.slug)));
         } catch {
           /* ok */
         }
@@ -221,6 +233,7 @@ export async function importPosts(
     }
 
     await fs.writeFile(postPath(post.slug), JSON.stringify(post, null, 2), "utf8");
+    queueGitUpsert(blogRelativePath(postPath(post.slug)), postPath(post.slug));
     imported += 1;
   }
 

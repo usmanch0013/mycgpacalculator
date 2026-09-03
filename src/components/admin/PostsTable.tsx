@@ -30,6 +30,7 @@ export default function PostsTable({ posts }: { posts: BlogPost[] }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [quickEditId, setQuickEditId] = useState<string | null>(null);
   const [quickForm, setQuickForm] = useState({
     title: "",
@@ -94,24 +95,38 @@ export default function PostsTable({ posts }: { posts: BlogPost[] }) {
     if (action === "delete" && !confirm("Move this article to trash? This cannot be undone.")) return;
     setBusyId(id);
     setError("");
+    setNotice("");
     try {
       if (action === "duplicate") {
         const res = await fetch(`/api/admin/posts/${id}/duplicate`, { method: "POST" });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Duplicate failed");
+        setNotice("Duplicate created as a draft.");
+        setFilter("draft");
       } else if (action === "delete") {
         const res = await fetch(`/api/admin/posts/${id}`, { method: "DELETE" });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || "Delete failed");
         setSelected((prev) => prev.filter((x) => x !== id));
+        setNotice("Article deleted.");
       } else {
         const res = await fetch(`/api/admin/posts/${id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: action === "publish" ? "published" : "draft" }),
+          body: JSON.stringify({
+            status: action === "publish" ? "published" : "draft",
+            syncGit: true,
+          }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Update failed");
+        if (action === "draft") {
+          setFilter("draft");
+          setNotice("Saved as draft — article is still here under Drafts.");
+        } else {
+          setFilter("published");
+          setNotice("Article published.");
+        }
       }
       router.refresh();
     } catch (e) {
@@ -124,15 +139,17 @@ export default function PostsTable({ posts }: { posts: BlogPost[] }) {
   async function saveQuickEdit(id: string) {
     setBusyId(id);
     setError("");
+    setNotice("");
     try {
       const res = await fetch(`/api/admin/posts/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(quickForm),
+        body: JSON.stringify({ ...quickForm, syncGit: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Quick edit failed");
       setQuickEditId(null);
+      setNotice("Article updated.");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Quick edit failed");
@@ -148,6 +165,7 @@ export default function PostsTable({ posts }: { posts: BlogPost[] }) {
     }
     setBulkBusy(true);
     setError("");
+    setNotice("");
     try {
       const res = await fetch("/api/admin/posts/bulk", {
         method: "POST",
@@ -157,6 +175,10 @@ export default function PostsTable({ posts }: { posts: BlogPost[] }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Bulk action failed");
       setSelected([]);
+      if (bulkAction === "draft") setFilter("draft");
+      if (bulkAction === "publish") setFilter("published");
+      if (bulkAction === "duplicate") setFilter("draft");
+      setNotice("Bulk action completed.");
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Bulk action failed");
@@ -226,6 +248,7 @@ export default function PostsTable({ posts }: { posts: BlogPost[] }) {
       </div>
 
       {error && <p className="posts-table__error">{error}</p>}
+      {notice && <p className="posts-table__notice">{notice}</p>}
 
       {visible.length === 0 ? (
         <p className="posts-table__empty">No articles match this filter.</p>

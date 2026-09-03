@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { exportAllPosts, importPosts } from "@/lib/blog/storage";
+import { safeFlushGitSyncQueue } from "@/lib/blog/github-sync";
 import { revalidateBlogPaths } from "@/lib/blog/revalidate";
 import type { BlogPost } from "@/lib/blog/types";
 
@@ -35,9 +36,10 @@ export async function POST(request: Request) {
 
     const mode = body.mode === "replace" ? "replace" : "merge";
     const count = await importPosts(posts, mode);
+    const syncWarning = await safeFlushGitSyncQueue();
     revalidateBlogPaths();
 
-    return NextResponse.json({ ok: true, count });
+    return NextResponse.json({ ok: true, count, syncWarning });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Import failed" },

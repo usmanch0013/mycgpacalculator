@@ -176,29 +176,28 @@ export default function CalculatorTabs({
     backgroundPosition: 'right 1rem center',
   };
 
-  return (
-    <section className={`calc-section ${university ? 'calc-section--embedded' : ''}`} id="calculator">
-      <div className="container calc-wrapper">
-        {university ? (
-          <div className="uni-calc-bar">
-            <span className="uni-calc-bar-label">
-              Grading system locked to <strong>{GRADING_SYSTEMS[gradingSystem]?.name ?? gradingSystem}</strong>
-            </span>
-          </div>
-        ) : (
-          <div className="section-header">
-            <div className="badge badge-glow">Calculator</div>
-            <h2 className="section-title">CGPA Calculator</h2>
-            <p className="section-subtitle" style={{ marginBottom: 0 }}>
-              Add your courses, pick a grading system, and see semester GPA or cumulative CGPA straight away.
-            </p>
-            <p className="section-subtitle">
-              Switch to <strong>Pro</strong> if you want target-GPA planning or a printable summary.
-            </p>
-          </div>
-        )}
+  const calculatorContent = (
+    <>
+      {university ? (
+        <div className="uni-calc-bar">
+          <span className="uni-calc-bar-label">
+            Grading system locked to <strong>{GRADING_SYSTEMS[gradingSystem]?.name ?? gradingSystem}</strong>
+          </span>
+        </div>
+      ) : (
+        <div className="section-header">
+          <div className="badge badge-glow">Calculator</div>
+          <h2 className="section-title">CGPA Calculator</h2>
+          <p className="section-subtitle" style={{ marginBottom: 0 }}>
+            Add your courses, pick a grading system, and see semester GPA or cumulative CGPA straight away.
+          </p>
+          <p className="section-subtitle">
+            Switch to <strong>Pro</strong> if you want target-GPA planning or a printable summary.
+          </p>
+        </div>
+      )}
 
-        <div className={`calc-main-card ${isPro ? 'calc-main-card--pro' : ''}`}>
+      <div className={`calc-main-card ${isPro ? 'calc-main-card--pro' : ''}`}>
           <div className="calc-header">
             <div className="calc-header-left">
               <div className="tab-group">
@@ -396,6 +395,21 @@ export default function CalculatorTabs({
             </table>
           </div>
         </details>
+    </>
+  );
+
+  if (university) {
+    return (
+      <div className="uni-calc-tool" id="calculator">
+        {calculatorContent}
+      </div>
+    );
+  }
+
+  return (
+    <section className="calc-section" id="calculator">
+      <div className="container calc-wrapper">
+        {calculatorContent}
       </div>
     </section>
   );

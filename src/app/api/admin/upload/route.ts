@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
+import { queueGitUpsert, safeFlushGitSyncQueue } from "@/lib/blog/github-sync";
 
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
@@ -43,7 +44,10 @@ export async function POST(request: Request) {
 
     await mkdir(dir, { recursive: true });
     const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(path.join(dir, filename), buffer);
+    const absolutePath = path.join(dir, filename);
+    await writeFile(absolutePath, buffer);
+    queueGitUpsert(`public/blog-images/${filename}`, absolutePath);
+    await safeFlushGitSyncQueue();
 
     return NextResponse.json({ url: `/blog-images/${filename}` });
   } catch {
