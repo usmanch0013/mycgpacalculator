@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BlogBackupPanel from "@/components/admin/BlogBackupPanel";
 import PostsTable from "@/components/admin/PostsTable";
 import { getAllPosts } from "@/lib/blog/storage";
 
@@ -31,7 +32,7 @@ export default async function AdminDashboardPage() {
           <ul>
             <li>Set a focus keyword before writing</li>
             <li>Upload a featured image for every post</li>
-            <li>Target 600+ words for better SEO</li>
+            <li>Before redeploy, download an article backup</li>
           </ul>
         </div>
       </section>
@@ -59,6 +60,8 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
       </div>
+
+      <BlogBackupPanel />
 
       <section className="admin-panel">
         <header className="admin-panel__head">

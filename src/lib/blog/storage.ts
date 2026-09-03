@@ -154,3 +154,75 @@ export async function duplicatePost(id: string): Promise<BlogPost> {
     featuredImage: existing.featuredImage,
   });
 }
+
+export interface BlogBackupPayload {
+  version: 1;
+  exportedAt: string;
+  posts: BlogPost[];
+}
+
+export async function exportAllPosts(): Promise<BlogBackupPayload> {
+  const posts = await getAllPosts();
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    posts,
+  };
+}
+
+export async function importPosts(
+  posts: BlogPost[],
+  mode: "merge" | "replace" = "merge"
+): Promise<number> {
+  await ensureDir();
+
+  if (mode === "replace") {
+    const existing = await getAllPosts();
+    for (const post of existing) {
+      try {
+        await fs.unlink(postPath(post.slug));
+      } catch {
+        /* ok */
+      }
+    }
+  }
+
+  let imported = 0;
+  for (const raw of posts) {
+    if (!raw?.id || !raw?.slug || typeof raw.content !== "string") continue;
+
+    const slugError = validatePostSlug(raw.slug.trim().toLowerCase());
+    if (slugError) continue;
+
+    const post: BlogPost = {
+      id: raw.id,
+      slug: raw.slug.trim().toLowerCase(),
+      title: raw.title?.trim() ?? "",
+      focusKeyword: raw.focusKeyword?.trim() ?? "",
+      metaDescription: raw.metaDescription?.trim() ?? "",
+      excerpt: raw.excerpt?.trim() ?? "",
+      content: raw.content,
+      status: raw.status === "published" ? "published" : "draft",
+      publishedAt: raw.publishedAt || new Date().toISOString(),
+      updatedAt: raw.updatedAt || new Date().toISOString(),
+      author: raw.author?.trim() || "CGPA Calculator Pro",
+      featuredImage: raw.featuredImage?.trim() || undefined,
+    };
+
+    if (mode === "merge") {
+      const byId = await getPostById(post.id);
+      if (byId && byId.slug !== post.slug) {
+        try {
+          await fs.unlink(postPath(byId.slug));
+        } catch {
+          /* ok */
+        }
+      }
+    }
+
+    await fs.writeFile(postPath(post.slug), JSON.stringify(post, null, 2), "utf8");
+    imported += 1;
+  }
+
+  return imported;
+}
