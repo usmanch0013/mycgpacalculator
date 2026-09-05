@@ -176,11 +176,11 @@ function extractParagraphs(content: string): string[] {
 }
 
 function countRealListItems(content: string): number {
-  const listBlocks = content.match(/<(ul|ol)\b[^>]*>[\s\S]*?<\/\1>/gi) ?? [];
-  const htmlItems = listBlocks.reduce(
-    (total, block) => total + (block.match(/<li\b/gi)?.length ?? 0),
-    0
-  );
+  const listBlocks: string[] = content.match(/<(?:ul|ol)\b[^>]*>[\s\S]*?<\/(?:ul|ol)>/gi) ?? [];
+  let htmlItems = 0;
+  for (const block of listBlocks) {
+    htmlItems += block.match(/<li\b/gi)?.length ?? 0;
+  }
   if (htmlItems >= 2) return htmlItems;
 
   const lines = content.split(/\n/);
