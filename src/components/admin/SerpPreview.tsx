@@ -1,17 +1,20 @@
 "use client";
 
+import { highlightKeyword } from "@/lib/blog/keyword-highlight";
 import { getSiteHost } from "@/lib/blog/paths";
 
 interface SerpPreviewProps {
   title: string;
   slug: string;
   metaDescription: string;
+  focusKeyword?: string;
 }
 
 export default function SerpPreview({
   title,
   slug,
   metaDescription,
+  focusKeyword = "",
 }: SerpPreviewProps) {
   const displayTitle = title.trim() || "Your article title";
   const displayDesc =
@@ -24,8 +27,8 @@ export default function SerpPreview({
       <p className="serp-preview__label">Search preview</p>
       <div className="serp-preview__card">
         <p className="serp-preview__url">{url}</p>
-        <p className="serp-preview__title">{displayTitle}</p>
-        <p className="serp-preview__desc">{displayDesc}</p>
+        <p className="serp-preview__title">{highlightKeyword(displayTitle, focusKeyword)}</p>
+        <p className="serp-preview__desc">{highlightKeyword(displayDesc, focusKeyword)}</p>
       </div>
     </div>
   );

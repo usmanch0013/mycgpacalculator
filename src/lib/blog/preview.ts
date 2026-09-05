@@ -7,6 +7,10 @@ export interface ArticlePreviewPayload {
   excerpt: string;
   author: string;
   featuredImage: string;
+  featuredImageAlt?: string;
+  featuredImageTitle?: string;
+  featuredImageDescription?: string;
+  categories?: string[];
 }
 
 export function saveArticlePreview(payload: ArticlePreviewPayload) {

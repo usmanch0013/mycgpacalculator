@@ -11,12 +11,14 @@ import { convertPastedHtmlToContent, getClipboardHtml } from "@/lib/blog/paste-h
 import {
   applyBlockFormat,
   detectBlockFormat,
+  handleListEnterKey,
   insertLink,
   insertHtmlAtSelection,
   sourceToVisualHtml,
   toggleHighlight,
   toggleList,
   visualHtmlToSource,
+  visualHtmlToStoredSource,
   wrapRangeWithBlockquote,
   type BlockFormat,
 } from "@/lib/blog/visual-html";
@@ -136,7 +138,7 @@ const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(function 
   }
 
   useImperativeHandle(ref, () => ({
-    getHtml: () => visualHtmlToSource(editorRef.current?.innerHTML || ""),
+    getHtml: () => visualHtmlToStoredSource(editorRef.current?.innerHTML || ""),
     focus: () => editorRef.current?.focus(),
     exec: runCommand,
     insertHtml: (html: string) => {
@@ -167,6 +169,18 @@ const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(function 
     syncFromEditor();
   }
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Enter" || event.shiftKey) return;
+
+    const el = editorRef.current;
+    if (!el) return;
+
+    if (handleListEnterKey(el)) {
+      event.preventDefault();
+      syncFromEditor();
+    }
+  }
+
   return (
     <div
       ref={editorRef}
@@ -178,6 +192,7 @@ const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(function 
       aria-label="Visual editor"
       onInput={syncFromEditor}
       onPaste={handlePaste}
+      onKeyDown={handleKeyDown}
       onBlur={syncFromEditor}
     />
   );

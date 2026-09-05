@@ -1,3 +1,4 @@
+import { BLOG_CONFIG } from "./config";
 import type { SeoCheck, SeoCheckCategory, SeoCheckStatus, SeoScoreResult } from "./types";
 
 function countWords(text: string): number {
@@ -10,19 +11,109 @@ function countWords(text: string): number {
 
 function stripMarkdown(md: string): string {
   return md
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`[^`]+`/g, " ")
     .replace(/#{1,6}\s/g, "")
     .replace(/\*\*([^*]+)\*\*/g, "$1")
     .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, " ")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function keywordInText(text: string, keyword: string): boolean {
-  if (!keyword.trim()) return false;
-  return text.toLowerCase().includes(keyword.trim().toLowerCase());
+  const needle = keyword.trim().toLowerCase().replace(/\s+/g, " ");
+  if (!needle) return false;
+  const hay = text.toLowerCase().replace(/\s+/g, " ");
+  const pattern = new RegExp(
+    `(^|[^a-z0-9])${escapeRegExp(needle).replace(/\s+/g, "\\s+")}([^a-z0-9]|$)`,
+    "i"
+  );
+  return pattern.test(hay);
+}
+
+function getIntroText(plain: string): string {
+  const words = plain.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "";
+  const introCount = Math.max(1, Math.ceil(words.length * 0.1));
+  return words.slice(0, introCount).join(" ");
+}
+
+const TITLE_POWER_WORDS = [
+  "amazing",
+  "best",
+  "complete",
+  "easy",
+  "essential",
+  "exclusive",
+  "free",
+  "incredible",
+  "instant",
+  "instantly",
+  "latest",
+  "powerful",
+  "proven",
+  "quick",
+  "quickly",
+  "secret",
+  "simple",
+  "step-by-step",
+  "ultimate",
+  "useful",
+];
+
+const TITLE_POSITIVE_WORDS = [
+  "amazing",
+  "best",
+  "better",
+  "easy",
+  "effective",
+  "excellent",
+  "free",
+  "great",
+  "helpful",
+  "perfect",
+  "powerful",
+  "proven",
+  "simple",
+  "success",
+  "useful",
+  "win",
+];
+
+const TITLE_NEGATIVE_WORDS = [
+  "avoid",
+  "danger",
+  "don't",
+  "fail",
+  "lose",
+  "mistake",
+  "never",
+  "problem",
+  "stop",
+  "warning",
+  "without",
+  "worst",
+];
+
+function findTitleWords(title: string, dictionary: string[]): string[] {
+  const hay = title.toLowerCase();
+  return dictionary.filter((word) => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i").test(hay);
+  });
 }
 
 function keywordAtStart(text: string, keyword: string): boolean {
@@ -32,14 +123,184 @@ function keywordAtStart(text: string, keyword: string): boolean {
   return plain.startsWith(kw) || plain.slice(0, 40).includes(kw);
 }
 
-function keywordDensity(text: string, keyword: string): number {
+function extractHeadingTexts(content: string, levels: Array<2 | 3> = [2, 3]): string[] {
+  const headings: string[] = [];
+
+  for (const level of levels) {
+    const htmlRe = new RegExp(`<h${level}\\b[^>]*>([\\s\\S]*?)<\\/h${level}>`, "gi");
+    let match: RegExpExecArray | null;
+    while ((match = htmlRe.exec(content)) !== null) {
+      const text = stripMarkdown(match[1]).replace(/\s+/g, " ").trim();
+      if (text) headings.push(text);
+    }
+
+    const mdRe = new RegExp(`^#{${level}}\\s+(.+)$`, "gm");
+    while ((match = mdRe.exec(content)) !== null) {
+      const text = stripMarkdown(match[1]).replace(/\s+/g, " ").trim();
+      if (text) headings.push(text);
+    }
+  }
+
+  if (levels.includes(2)) {
+    const sectionRe = /<(?:p|div|h2)\b[^>]*class=["'][^"']*blog-section-heading[^"']*["'][^>]*>([\s\S]*?)<\/(?:p|div|h2)>/gi;
+    let match: RegExpExecArray | null;
+    while ((match = sectionRe.exec(content)) !== null) {
+      const text = stripMarkdown(match[1]).replace(/\s+/g, " ").trim();
+      if (text && !headings.includes(text)) headings.push(text);
+    }
+  }
+
+  return headings;
+}
+
+function extractParagraphs(content: string): string[] {
+  const paragraphs: string[] = [];
+  const pRe = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = pRe.exec(content)) !== null) {
+    if (/blog-section-heading/i.test(match[0])) continue;
+    const chunks = match[1].split(/<br\s*\/?>\s*(?:<br\s*\/?>)+/i);
+    for (const chunk of chunks) {
+      const text = stripMarkdown(chunk).replace(/\s+/g, " ").trim();
+      if (text.split(/\s+/).filter(Boolean).length >= 6) paragraphs.push(text);
+    }
+  }
+
+  if (paragraphs.length) return paragraphs;
+
+  return stripMarkdown(content)
+    .split(/\n{2,}/)
+    .map((part) => part.replace(/\s+/g, " ").trim())
+    .filter((part) => part.split(/\s+/).length >= 6);
+}
+
+function countRealListItems(content: string): number {
+  const listBlocks = content.match(/<(ul|ol)\b[^>]*>[\s\S]*?<\/\1>/gi) ?? [];
+  const htmlItems = listBlocks.reduce(
+    (total, block) => total + (block.match(/<li\b/gi)?.length ?? 0),
+    0
+  );
+  if (htmlItems >= 2) return htmlItems;
+
+  const lines = content.split(/\n/);
+  let run = 0;
+  let best = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^[-*•]\s+\S/.test(trimmed) || /^\d+[.)]\s+\S/.test(trimmed)) {
+      run += 1;
+      best = Math.max(best, run);
+    } else if (trimmed) {
+      run = 0;
+    }
+  }
+  return best;
+}
+
+function countRichMedia(content: string, featuredImage = ""): number {
+  const htmlImages = content.match(/<img\b/gi)?.length ?? 0;
+  const markdownImages = content.match(/!\[[^\]]*]\([^)]+\)/g)?.length ?? 0;
+  const videos =
+    (content.match(/<video\b/gi)?.length ?? 0) +
+    (content.match(/<iframe\b[^>]*(youtube|youtu\.be|vimeo)/gi)?.length ?? 0);
+  const featured = featuredImage.trim() ? 1 : 0;
+  return htmlImages + markdownImages + videos + featured;
+}
+
+function collectHrefs(content: string): string[] {
+  const withoutImages = content.replace(/!\[[^\]]*]\([^)]+\)/g, " ");
+  const hrefs: string[] = [];
+
+  const quoted = /<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1/gi;
+  let match: RegExpExecArray | null;
+  while ((match = quoted.exec(withoutImages)) !== null) {
+    hrefs.push(match[2]);
+  }
+
+  const markdown = /\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+  while ((match = markdown.exec(withoutImages)) !== null) {
+    hrefs.push(match[2]);
+  }
+
+  return hrefs;
+}
+
+function classifyHref(href: string): "internal" | "external" | "ignore" {
+  const raw = href.trim().replace(/&amp;/g, "&");
+  if (!raw || raw.startsWith("#") || /^(mailto:|tel:|javascript:)/i.test(raw)) {
+    return "ignore";
+  }
+
+  if (raw.startsWith("/")) return "internal";
+
+  try {
+    const parsed = new URL(raw, `${BLOG_CONFIG.siteUrl}/`);
+    const siteHost = new URL(BLOG_CONFIG.siteUrl).hostname.replace(/^www\./, "");
+    const host = parsed.hostname.replace(/^www\./, "");
+    if (host === siteHost || host === "localhost") return "internal";
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return "external";
+  } catch {
+    if (!raw.includes("://") && !raw.includes(" ")) return "internal";
+  }
+
+  return "ignore";
+}
+
+function countLinks(content: string): { internal: number; external: number } {
+  const uniqueInternal = new Set<string>();
+  const uniqueExternal = new Set<string>();
+
+  for (const href of collectHrefs(content)) {
+    const kind = classifyHref(href);
+    if (kind === "internal") uniqueInternal.add(href.split("#")[0].toLowerCase());
+    if (kind === "external") uniqueExternal.add(href.split("#")[0].toLowerCase());
+  }
+
+  return { internal: uniqueInternal.size, external: uniqueExternal.size };
+}
+
+function hasImage(content: string): boolean {
+  return /<img\b/i.test(content) || /!\[([^\]]*)\]\(/.test(content);
+}
+
+function hasImageMissingAlt(content: string): boolean {
+  const htmlMissingAlt = /<img\b(?![^>]*\balt=)[^>]*>/i.test(content);
+  const htmlEmptyAlt = /<img\b[^>]*\balt=["']\s*["'][^>]*>/i.test(content);
+  return htmlMissingAlt || htmlEmptyAlt || /!\[\s*\]\(/.test(content);
+}
+
+function uniqueKeywords(...groups: Array<string | string[] | undefined>): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const group of groups) {
+    const values = Array.isArray(group) ? group : group ? [group] : [];
+    for (const value of values) {
+      const keyword = value.trim().replace(/\s+/g, " ");
+      if (!keyword) continue;
+      const key = keyword.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(keyword);
+    }
+  }
+
+  return result;
+}
+
+function keywordDensity(text: string, keywords: string[]): number {
   const words = countWords(text);
-  if (words === 0 || !keyword.trim()) return 0;
-  const kw = keyword.trim().toLowerCase();
+  const unique = uniqueKeywords(keywords);
+  if (words === 0 || unique.length === 0) return 0;
   const plain = stripMarkdown(text).toLowerCase();
-  const matches = plain.split(kw).length - 1;
-  const kwWordCount = kw.split(/\s+/).length;
-  return (matches * kwWordCount / words) * 100;
+  let weighted = 0;
+  for (const keyword of unique) {
+    const kw = keyword.toLowerCase();
+    const matches = plain.split(kw).length - 1;
+    weighted += matches * kw.split(/\s+/).length;
+  }
+  return (weighted / words) * 100;
 }
 
 function check(
@@ -64,18 +325,53 @@ function check(
   return { id, label, status, message, weight, category };
 }
 
+export interface ExistingFocusKeyword {
+  id?: string;
+  keyword: string;
+  title?: string;
+  status?: "draft" | "published";
+}
+
+function normalizeFocusKeyword(keyword: string): string {
+  return keyword.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function findDuplicateKeywords(
+  focusKeyword: string,
+  existing: ExistingFocusKeyword[] | undefined,
+  currentPostId?: string
+): ExistingFocusKeyword[] {
+  const current = normalizeFocusKeyword(focusKeyword);
+  if (!current || !existing?.length) return [];
+
+  return existing.filter((item) => {
+    if (currentPostId && item.id && item.id === currentPostId) return false;
+    return normalizeFocusKeyword(item.keyword) === current;
+  });
+}
+
 export function analyzeSeo(
   title: string,
   slug: string,
   metaDescription: string,
   focusKeyword: string,
   content: string,
-  options?: { excerpt?: string; featuredImage?: string }
+  options?: {
+    excerpt?: string;
+    featuredImage?: string;
+    featuredImageAlt?: string;
+    secondaryKeywords?: string[];
+    currentPostId?: string;
+    existingFocusKeywords?: ExistingFocusKeyword[];
+  }
 ): SeoScoreResult {
   const plain = stripMarkdown(content);
   const wordCount = countWords(content);
   const excerpt = options?.excerpt ?? "";
   const featuredImage = options?.featuredImage ?? "";
+  const featuredImageAlt = options?.featuredImageAlt ?? "";
+  const densityKeywords = uniqueKeywords(focusKeyword, options?.secondaryKeywords);
+  const linkCounts = countLinks(content);
   const checks: SeoCheck[] = [];
 
   const titleLen = title.trim().length;
@@ -98,8 +394,8 @@ export function analyzeSeo(
       "Focus keyword in title",
       keywordInText(title, focusKeyword),
       false,
-      "Focus keyword appears in the title.",
-      "Add your focus keyword to the title.",
+      "Primary keyword appears in the SEO title (Google preview).",
+      "Add the primary keyword to the SEO title so it can appear in Google preview.",
       10,
       "basic"
     )
@@ -114,6 +410,55 @@ export function analyzeSeo(
       "Focus keyword appears early in the title — great for SEO.",
       "Move the focus keyword closer to the start of the title.",
       6,
+      "title_readability"
+    )
+  );
+
+  const titleHasNumber = /\d/.test(title);
+  checks.push(
+    check(
+      "title-number",
+      "Number in title",
+      titleHasNumber,
+      false,
+      "Title contains a number — this often improves click-through.",
+      "Add a number to the title (e.g. 5 steps, 2026, or 4.0 scale).",
+      4,
+      "title_readability"
+    )
+  );
+
+  const powerWords = findTitleWords(title, TITLE_POWER_WORDS);
+  checks.push(
+    check(
+      "title-power-words",
+      "Power words in title",
+      powerWords.length > 0,
+      false,
+      `Title uses a power word (${powerWords.slice(0, 3).join(", ")}).`,
+      "Add a power word to the title (easy, best, simple, complete, proven, etc.).",
+      4,
+      "title_readability"
+    )
+  );
+
+  const positiveWords = findTitleWords(title, TITLE_POSITIVE_WORDS);
+  const negativeWords = findTitleWords(title, TITLE_NEGATIVE_WORDS);
+  const sentimentWords = [...positiveWords, ...negativeWords];
+  const sentimentLabel = positiveWords.length
+    ? "positive"
+    : negativeWords.length
+      ? "negative"
+      : "";
+  checks.push(
+    check(
+      "title-sentiment",
+      "Title sentiment",
+      sentimentWords.length > 0,
+      false,
+      `Title has ${sentimentLabel} sentiment (${sentimentWords.slice(0, 3).join(", ")}).`,
+      "Add positive or negative sentiment to the title (easy, best, avoid, mistakes, etc.).",
+      3,
       "title_readability"
     )
   );
@@ -138,8 +483,8 @@ export function analyzeSeo(
       "Focus keyword in meta description",
       keywordInText(metaDescription, focusKeyword),
       false,
-      "Focus keyword appears in the meta description.",
-      "Add the focus keyword to your meta description.",
+      "Primary keyword appears in the meta description (Google preview).",
+      "Add the primary keyword to the meta description so it can appear in Google preview.",
       8,
       "basic"
     )
@@ -188,32 +533,59 @@ export function analyzeSeo(
     )
   );
 
-  const firstChunk = plain.slice(0, Math.max(plain.length * 0.1, 200));
+  const keywordDupes = findDuplicateKeywords(
+    focusKeyword,
+    options?.existingFocusKeywords,
+    options?.currentPostId
+  );
+  const publishedDupes = keywordDupes.filter((item) => item.status === "published");
+  const otherDupes = publishedDupes.length ? publishedDupes : keywordDupes;
+  const dupeTitle = otherDupes[0]?.title?.trim() || "another article";
+  checks.push(
+    check(
+      "keyword-unique",
+      "Primary keyword unused elsewhere",
+      Boolean(focusKeyword.trim()) && keywordDupes.length === 0,
+      !focusKeyword.trim() || (keywordDupes.length > 0 && publishedDupes.length === 0),
+      "Primary keyword is unique — not used on another article.",
+      !focusKeyword.trim()
+        ? "Set a primary keyword to check if it is already used on another article."
+        : publishedDupes.length
+          ? `Primary keyword is already used on “${dupeTitle}”. Choose a different focus keyword.`
+          : `Primary keyword is already used on the draft “${dupeTitle}”.`,
+      6,
+      "additional"
+    )
+  );
+
+  const introText = getIntroText(plain);
   checks.push(
     check(
       "intro-keyword",
       "Keyword in introduction",
-      keywordInText(firstChunk, focusKeyword),
+      keywordInText(introText, focusKeyword),
       false,
-      "Focus keyword appears early in the content.",
-      "Use the focus keyword in the first paragraph or two.",
+      "Focus keyword appears in the first 10% of the content.",
+      "Add the focus keyword in the first 10% of the article (usually the opening paragraph).",
       8,
       "basic"
     )
   );
 
-  const h2Matches = content.match(/^##\s+.+$/gm) ?? [];
-  const h2HasKw = h2Matches.some((h) => keywordInText(h, focusKeyword));
+  const h2Texts = extractHeadingTexts(content, [2]);
+  const h3Texts = extractHeadingTexts(content, [3]);
+  const headingTexts = [...h2Texts, ...h3Texts];
+  const headingHasKw = headingTexts.some((heading) => keywordInText(heading, focusKeyword));
   checks.push(
     check(
       "heading-keyword",
       "Keyword in subheading (H2)",
-      h2HasKw,
-      h2Matches.length > 0,
-      "Focus keyword appears in a subheading (H2).",
-      h2Matches.length === 0
+      headingHasKw,
+      h2Texts.length > 0 || h3Texts.length > 0,
+      "Focus keyword appears in a subheading (H2/H3).",
+      headingTexts.length === 0
         ? "Add H2 subheadings using the toolbar."
-        : "Add the focus keyword to at least one H2 heading.",
+        : "Add the focus keyword to at least one H2 or H3 heading.",
       6,
       "additional"
     )
@@ -234,109 +606,135 @@ export function analyzeSeo(
     )
   );
 
-  const density = keywordDensity(content, focusKeyword);
+  const density = keywordDensity(content, densityKeywords);
+  const extraCount = Math.max(0, densityKeywords.length - (focusKeyword.trim() ? 1 : 0));
+  const densityHint =
+    extraCount > 0 ? ` (primary + ${extraCount} secondary)` : "";
   checks.push(
     check(
       "keyword-density",
       "Keyword density",
-      density >= 0.5 && density <= 2.5,
+      density >= 1 && density <= 2.5,
       density > 0 && density < 3.5,
-      `Keyword density is ${density.toFixed(2)}% — healthy range.`,
+      `Keyword density is ${density.toFixed(2)}%${densityHint} — healthy range (1–2.5%).`,
       density === 0
-        ? "Focus keyword not found in content body."
-        : `Density ${density.toFixed(2)}% — aim for 0.5–2.5%.`,
+        ? "Focus keyword not found in content body. Add it, or use secondary keywords to cover related phrases."
+        : `Density ${density.toFixed(2)}%${densityHint} — aim for at least 1% (ideal 1–2.5%). Add the primary keyword more often, or use secondary keywords.`,
       6,
       "additional"
     )
   );
 
-  const hasInternal = /\[([^\]]+)\]\(\/(blog|calculator|universities|about|contact|privacy|terms)/.test(
-    content
-  );
+  const minInternalLinks = 4;
   checks.push(
     check(
       "internal-links",
       "Internal links",
-      hasInternal,
-      /\[([^\]]+)\]\(\//.test(content),
-      "Content includes internal links to your site.",
-      "Add links to calculators or other pages on your site.",
+      linkCounts.internal >= minInternalLinks,
+      linkCounts.internal >= 1,
+      `${linkCounts.internal} internal links — good for site navigation.`,
+      linkCounts.internal === 0
+        ? "Add at least 4 internal links to calculators or other pages on your site."
+        : `${linkCounts.internal} internal link${linkCounts.internal === 1 ? "" : "s"} found — add ${minInternalLinks - linkCounts.internal} more to reach 4.`,
       6,
       "additional"
     )
   );
 
-  const hasExternal = /\[([^\]]+)\]\(https?:\/\//.test(content);
   checks.push(
     check(
       "external-links",
       "Outbound links",
-      hasExternal,
+      linkCounts.external >= 1,
       false,
-      "Article links to external sources — builds trust.",
-      "Consider citing an official source (ATO, Fair Work, etc.).",
+      "Article cites an official or external reference.",
+      "Add at least one official source or reference link (university site, UGC, etc.).",
       4,
       "additional"
     )
   );
 
-  const hasImages = /!\[([^\]]*)\]\(/.test(content);
-  const imagesMissingAlt = /!\[\s*\]\(/.test(content);
+  const hasContentImages = hasImage(content);
+  const imagesMissingAlt = hasImageMissingAlt(content);
+  const featuredHasAlt = Boolean(featuredImage.trim() && featuredImageAlt.trim());
+  const imagesPassed =
+    (hasContentImages && !imagesMissingAlt) || (!hasContentImages && featuredHasAlt);
   checks.push(
     check(
       "images",
       "Images with alt text",
-      hasImages && !imagesMissingAlt,
-      hasImages,
+      imagesPassed,
+      hasContentImages || Boolean(featuredImage.trim()),
       "Images include alt text for accessibility and SEO.",
-      hasImages
-        ? "Some images are missing alt text."
-        : "Add at least one image with descriptive alt text.",
+      hasContentImages && imagesMissingAlt
+        ? "Some article images are missing alt text."
+        : featuredImage.trim() && !featuredImageAlt.trim()
+          ? "Add alt text for the featured image."
+          : "Add at least one image with descriptive alt text.",
       5,
       "additional"
     )
   );
 
-  const hasH2 = /^##\s/m.test(content);
+  const hasH2 = h2Texts.length > 0;
   checks.push(
     check(
       "structure",
       "Heading structure",
-      hasH2 && /^#\s/m.test(content) === false,
-      hasH2,
-      "Good heading structure with H2 sections.",
-      "Break content into sections with H2 headings (page title is H1).",
+      h2Texts.length >= 1,
+      h3Texts.length > 0,
+      `Good heading structure — ${h2Texts.length} H2 section${h2Texts.length === 1 ? "" : "s"}.`,
+      h3Texts.length > 0
+        ? "H3 headings found — add H2 subheadings from the toolbar to structure the article."
+        : "Break content into sections with H2 headings (page title is H1).",
       5,
       "content_readability"
     )
   );
 
-  const paragraphs = plain.split(/\n\n+/).filter((p) => p.trim().length > 0);
-  const longParagraphs = paragraphs.filter((p) => p.split(/\s+/).length > 150);
+  const paragraphs = extractParagraphs(content);
+  const longParagraphs = paragraphs.filter((p) => p.split(/\s+/).length > 120);
   checks.push(
     check(
       "paragraph-length",
       "Short paragraphs",
-      longParagraphs.length === 0 && paragraphs.length >= 3,
-      longParagraphs.length === 0,
-      "Paragraphs are readable length.",
+      longParagraphs.length === 0 && paragraphs.length >= 2,
+      longParagraphs.length === 0 || paragraphs.length >= 2,
+      "Paragraphs are a readable length.",
       longParagraphs.length > 0
-        ? "Some paragraphs are very long — split them for readability."
-        : "Add more content sections with short paragraphs.",
+        ? `${longParagraphs.length} paragraph${longParagraphs.length === 1 ? "" : "s"} still over 120 words — split them for readability.`
+        : "Add more short paragraphs so the article is easier to scan.",
       4,
       "content_readability"
     )
   );
 
-  const hasLists = /^[-*]\s/m.test(content) || /^\d+\.\s/m.test(content);
+  const listItems = countRealListItems(content);
   checks.push(
     check(
       "lists",
       "Lists for scanability",
-      hasLists,
+      listItems >= 2,
       false,
       "Content uses bullet or numbered lists.",
-      "Add a bullet list to make key points easy to scan.",
+      "Add a bullet or numbered list to make key points easy to scan.",
+      4,
+      "content_readability"
+    )
+  );
+
+  const richMediaCount = countRichMedia(content, featuredImage);
+  const minRichMedia = 3;
+  checks.push(
+    check(
+      "rich-media",
+      "Rich media",
+      richMediaCount >= minRichMedia,
+      richMediaCount >= 1,
+      `${richMediaCount} images/videos in the article — good use of rich media.`,
+      richMediaCount === 0
+        ? "Add at least 3 images or videos in the article."
+        : `${richMediaCount} image${richMediaCount === 1 ? "" : "s"} found — add ${minRichMedia - richMediaCount} more (minimum 3).`,
       4,
       "content_readability"
     )

@@ -5,6 +5,7 @@ import {
   analyzeSeo,
   scoreColor,
   SEO_CATEGORY_LABELS,
+  type ExistingFocusKeyword,
 } from "@/lib/blog/seo-score";
 import type { SeoCheck, SeoCheckCategory } from "@/lib/blog/types";
 
@@ -13,9 +14,13 @@ interface RankMathSeoPanelProps {
   slug: string;
   metaDescription: string;
   focusKeyword: string;
+  secondaryKeywords?: string[];
   content: string;
   excerpt?: string;
   featuredImage?: string;
+  featuredImageAlt?: string;
+  currentPostId?: string;
+  existingFocusKeywords?: ExistingFocusKeyword[];
 }
 
 const CATEGORIES: SeoCheckCategory[] = [
@@ -88,7 +93,14 @@ export default function RankMathSeoPanel(props: RankMathSeoPanelProps) {
     props.metaDescription,
     props.focusKeyword,
     props.content,
-    { excerpt: props.excerpt, featuredImage: props.featuredImage }
+    {
+      excerpt: props.excerpt,
+      featuredImage: props.featuredImage,
+      featuredImageAlt: props.featuredImageAlt,
+      secondaryKeywords: props.secondaryKeywords,
+      currentPostId: props.currentPostId,
+      existingFocusKeywords: props.existingFocusKeywords,
+    }
   );
 
   return (
@@ -116,7 +128,14 @@ export function useSeoScore(props: RankMathSeoPanelProps) {
     props.metaDescription,
     props.focusKeyword,
     props.content,
-    { excerpt: props.excerpt, featuredImage: props.featuredImage }
+    {
+      excerpt: props.excerpt,
+      featuredImage: props.featuredImage,
+      featuredImageAlt: props.featuredImageAlt,
+      secondaryKeywords: props.secondaryKeywords,
+      currentPostId: props.currentPostId,
+      existingFocusKeywords: props.existingFocusKeywords,
+    }
   );
 }
 

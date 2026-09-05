@@ -83,9 +83,16 @@ export default function AdminArticlePreviewPage() {
         excerpt={data.excerpt}
         author={data.author}
         featuredImage={data.featuredImage}
+        featuredImageAlt={data.featuredImageAlt}
+        featuredImageTitle={data.featuredImageTitle}
+        featuredImageDescription={data.featuredImageDescription}
         html={html}
         content={data.content}
         publishedAt={new Date().toISOString()}
+        categories={(data.categories ?? []).map((slug) => ({
+          slug,
+          name: slug.replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+        }))}
       />
       <Footer />
     </>

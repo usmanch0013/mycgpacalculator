@@ -37,15 +37,23 @@ export function buildFaqHtml(items: FaqItem[]): string {
   return `<div class="blog-faq">\n${blocks}\n</div>`;
 }
 
-export function buildImageHtml(url: string, alt: string, align: "default" | "wide" | "center" = "default"): string {
+export function buildImageHtml(
+  url: string,
+  alt: string,
+  align: "default" | "wide" | "center" = "default",
+  extras?: { title?: string; description?: string }
+): string {
   const cleanUrl = url.trim();
   const cleanAlt = alt.trim() || "Image";
+  const cleanTitle = extras?.title?.trim() || "";
+  const caption = extras?.description?.trim() || cleanAlt;
   const alignClass =
     align === "wide" ? " blog-image--wide" : align === "center" ? " blog-image--center" : "";
+  const titleAttr = cleanTitle ? ` title="${escapeHtml(cleanTitle)}"` : "";
 
   return `<figure class="blog-image${alignClass}">
-<img src="${cleanUrl}" alt="${escapeHtml(cleanAlt)}" loading="lazy" />
-<figcaption>${escapeHtml(cleanAlt)}</figcaption>
+<img src="${cleanUrl}" alt="${escapeHtml(cleanAlt)}"${titleAttr} loading="lazy" />
+<figcaption>${escapeHtml(caption)}</figcaption>
 </figure>`;
 }
 

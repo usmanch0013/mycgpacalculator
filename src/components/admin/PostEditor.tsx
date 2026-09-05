@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ArticleTitleField from "@/components/admin/ArticleTitleField";
+import FocusKeywordFields from "@/components/admin/FocusKeywordFields";
 import ContentEditor, { type ContentEditorHandle } from "@/components/admin/ContentEditor";
 import PostSettingsPanel from "@/components/admin/PostSettingsPanel";
 import RankMathSeoPanel, { scoreColor, useSeoScore } from "@/components/admin/RankMathSeoPanel";
+import type { ExistingFocusKeyword } from "@/lib/blog/seo-score";
 import SerpPreview from "@/components/admin/SerpPreview";
 import SnippetEditorModal from "@/components/admin/SnippetEditorModal";
 import { getPostPath } from "@/lib/blog/paths";
@@ -23,12 +25,17 @@ const EMPTY = {
   title: "",
   slug: "",
   focusKeyword: "",
+  secondaryKeywords: [] as string[],
   metaDescription: "",
   excerpt: "",
   content: "",
   status: "draft" as PostStatus,
   author: "CGPA Calculator Pro",
   featuredImage: "",
+  featuredImageAlt: "",
+  featuredImageTitle: "",
+  featuredImageDescription: "",
+  categories: [] as string[],
 };
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -39,7 +46,9 @@ function hasDraftContent(form: typeof EMPTY) {
       form.content.replace(/<[^>]*>/g, "").trim() ||
       form.excerpt.trim() ||
       form.featuredImage.trim() ||
+      form.categories.length > 0 ||
       form.focusKeyword.trim() ||
+      form.secondaryKeywords.some((keyword) => keyword.trim()) ||
       form.metaDescription.trim()
   );
 }
@@ -51,12 +60,17 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
     title: post?.title ?? EMPTY.title,
     slug: post?.slug ?? EMPTY.slug,
     focusKeyword: post?.focusKeyword ?? EMPTY.focusKeyword,
+    secondaryKeywords: post?.secondaryKeywords ?? EMPTY.secondaryKeywords,
     metaDescription: post?.metaDescription ?? EMPTY.metaDescription,
     excerpt: post?.excerpt ?? EMPTY.excerpt,
     content: post?.content ?? EMPTY.content,
     status: post?.status ?? EMPTY.status,
     author: post?.author ?? EMPTY.author,
     featuredImage: post?.featuredImage ?? EMPTY.featuredImage,
+    featuredImageAlt: post?.featuredImageAlt ?? EMPTY.featuredImageAlt,
+    featuredImageTitle: post?.featuredImageTitle ?? EMPTY.featuredImageTitle,
+    featuredImageDescription: post?.featuredImageDescription ?? EMPTY.featuredImageDescription,
+    categories: post?.categories ?? EMPTY.categories,
   });
   const [postId, setPostId] = useState(post?.id ?? null);
   const [slugManual, setSlugManual] = useState(Boolean(post?.slug));
@@ -65,6 +79,7 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
   const [error, setError] = useState("");
   const [sidebarTab, setSidebarTab] = useState<"post" | "seo">("post");
   const [snippetOpen, setSnippetOpen] = useState(false);
+  const [existingFocusKeywords, setExistingFocusKeywords] = useState<ExistingFocusKeyword[]>([]);
   const formRef = useRef(form);
   const postIdRef = useRef(postId);
   const savingRef = useRef(false);
@@ -74,26 +89,62 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
       title: post?.title ?? EMPTY.title,
       slug: post?.slug ?? EMPTY.slug,
       focusKeyword: post?.focusKeyword ?? EMPTY.focusKeyword,
+      secondaryKeywords: post?.secondaryKeywords ?? EMPTY.secondaryKeywords,
       metaDescription: post?.metaDescription ?? EMPTY.metaDescription,
       excerpt: post?.excerpt ?? EMPTY.excerpt,
       content: post?.content ?? EMPTY.content,
       status: post?.status ?? EMPTY.status,
       author: post?.author ?? EMPTY.author,
       featuredImage: post?.featuredImage ?? EMPTY.featuredImage,
+      featuredImageAlt: post?.featuredImageAlt ?? EMPTY.featuredImageAlt,
+      featuredImageTitle: post?.featuredImageTitle ?? EMPTY.featuredImageTitle,
+      featuredImageDescription: post?.featuredImageDescription ?? EMPTY.featuredImageDescription,
+      categories: post?.categories ?? EMPTY.categories,
     })
   );
 
   formRef.current = form;
   postIdRef.current = postId;
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadKeywords() {
+      try {
+        const res = await fetch("/api/admin/posts", { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok || !Array.isArray(data) || !active) return;
+        setExistingFocusKeywords(
+          data.map((item: BlogPost) => ({
+            id: item.id,
+            keyword: item.focusKeyword,
+            title: item.title,
+            status: item.status,
+          }))
+        );
+      } catch {
+        /* keep empty */
+      }
+    }
+
+    void loadKeywords();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const seoProps = {
     title: form.title,
     slug: form.slug,
     metaDescription: form.metaDescription,
     focusKeyword: form.focusKeyword,
+    secondaryKeywords: form.secondaryKeywords,
     content: form.content,
     excerpt: form.excerpt,
     featuredImage: form.featuredImage,
+    featuredImageAlt: form.featuredImageAlt,
+    currentPostId: postId ?? undefined,
+    existingFocusKeywords,
   };
   const seo = useSeoScore(seoProps);
   const seoColor = scoreColor(seo.score);
@@ -214,6 +265,10 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
       excerpt: form.excerpt,
       author: form.author,
       featuredImage: form.featuredImage,
+      featuredImageAlt: form.featuredImageAlt,
+      featuredImageTitle: form.featuredImageTitle,
+      featuredImageDescription: form.featuredImageDescription,
+      categories: form.categories,
     });
 
     window.open("/admin/preview", "_blank", "noopener,noreferrer");
@@ -369,25 +424,35 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
                 author={form.author}
                 slug={form.slug}
                 excerpt={form.excerpt}
-                featuredImage={form.featuredImage}
+                featuredImage={{
+                  url: form.featuredImage,
+                  alt: form.featuredImageAlt,
+                  title: form.featuredImageTitle,
+                  description: form.featuredImageDescription,
+                }}
+                categories={form.categories}
                 wordCount={seo.wordCount}
                 onStatusChange={(v) => update("status", v)}
                 onAuthorChange={(v) => update("author", v)}
                 onSlugChange={(v) => update("slug", v)}
                 onExcerptChange={(v) => update("excerpt", v)}
-                onFeaturedImageChange={(v) => update("featuredImage", v)}
+                onFeaturedImageChange={(v) => {
+                  update("featuredImage", v.url);
+                  update("featuredImageAlt", v.alt);
+                  update("featuredImageTitle", v.title);
+                  update("featuredImageDescription", v.description);
+                }}
+                onCategoriesChange={(v) => update("categories", v)}
                 onSlugManual={() => setSlugManual(true)}
               />
             ) : (
               <div className="wp-seo-tab">
-                <label className="wp-side-field">
-                  <span>Focus keyword</span>
-                  <input
-                    value={form.focusKeyword}
-                    onChange={(e) => update("focusKeyword", e.target.value)}
-                    placeholder="e.g. how to calculate cgpa"
-                  />
-                </label>
+                <FocusKeywordFields
+                  primary={form.focusKeyword}
+                  secondary={form.secondaryKeywords}
+                  onPrimaryChange={(v) => update("focusKeyword", v)}
+                  onSecondaryChange={(v) => update("secondaryKeywords", v)}
+                />
 
                 <div className="wp-snippet-block">
                   <div className="wp-snippet-block__head">
@@ -404,6 +469,7 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
                     title={form.title}
                     slug={form.slug}
                     metaDescription={form.metaDescription}
+                    focusKeyword={form.focusKeyword}
                   />
                 </div>
 
@@ -420,6 +486,7 @@ export default function PostEditor({ post, mode }: PostEditorProps) {
         title={form.title}
         slug={form.slug}
         metaDescription={form.metaDescription}
+        focusKeyword={form.focusKeyword}
         onTitleChange={(v) => update("title", v)}
         onSlugChange={(v) => {
           setSlugManual(true);

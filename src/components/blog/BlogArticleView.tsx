@@ -11,9 +11,13 @@ interface BlogArticleViewProps {
   excerpt?: string;
   author: string;
   featuredImage?: string;
+  featuredImageAlt?: string;
+  featuredImageTitle?: string;
+  featuredImageDescription?: string;
   html: string;
   content: string;
   publishedAt: string;
+  categories?: Array<{ slug: string; name: string }>;
 }
 
 function authorInitials(name: string) {
@@ -31,13 +35,18 @@ export default function BlogArticleView({
   excerpt = "",
   author,
   featuredImage = "",
+  featuredImageAlt = "",
+  featuredImageTitle = "",
+  featuredImageDescription = "",
   html,
   content,
   publishedAt,
+  categories = [],
 }: BlogArticleViewProps) {
   const seo = analyzeSeo(title, slug, excerpt, "", content, {
     excerpt,
     featuredImage,
+    featuredImageAlt,
   });
   const readingMin = estimateReadingTime(seo.wordCount);
   const displayTitle = title.trim() || "Untitled article";
@@ -67,15 +76,37 @@ export default function BlogArticleView({
 
       <header className={`blog-article__hero${featuredImage ? " blog-article__hero--image" : ""}`}>
         {featuredImage && (
-          <div className="blog-article__hero-media" aria-hidden="true">
-            <img src={featuredImage} alt="" />
+          <div className="blog-article__hero-media">
+            <img
+              src={featuredImage}
+              alt={featuredImageAlt || displayTitle}
+              title={featuredImageTitle || undefined}
+            />
             <span className="blog-article__hero-overlay" />
           </div>
         )}
 
         <div className="container blog-article__hero-content">
-          <span className="blog-article__kicker">CGPA &amp; GPA Guide</span>
+          <span className="blog-article__kicker">
+            {categories[0]?.name || "CGPA & GPA Guide"}
+          </span>
+          {categories.length > 0 && (
+            <div className="blog-article__cats">
+              {categories.map((category) => (
+                <Link
+                  key={category.slug}
+                  href={`/blog?category=${category.slug}`}
+                  className="blog-cat"
+                >
+                  {category.name}
+                </Link>
+              ))}
+            </div>
+          )}
           <h1 className="blog-article__title">{displayTitle}</h1>
+          {featuredImageDescription.trim() && (
+            <p className="blog-article__image-desc">{featuredImageDescription}</p>
+          )}
 
           {excerpt.trim() && <p className="blog-article__excerpt">{excerpt}</p>}
 

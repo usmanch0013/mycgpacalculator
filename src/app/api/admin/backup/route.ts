@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { importCategories } from "@/lib/blog/categories";
 import { exportAllPosts, importPosts } from "@/lib/blog/storage";
 import { safeFlushGitSyncQueue } from "@/lib/blog/github-sync";
 import { revalidateBlogPaths } from "@/lib/blog/revalidate";
-import type { BlogPost } from "@/lib/blog/types";
+import type { BlogCategory, BlogPost } from "@/lib/blog/types";
 
 export async function GET() {
   try {
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       posts?: BlogPost[];
+      categories?: BlogCategory[];
       mode?: "merge" | "replace";
     };
     const posts = Array.isArray(body.posts) ? body.posts : [];
@@ -35,6 +37,9 @@ export async function POST(request: Request) {
     }
 
     const mode = body.mode === "replace" ? "replace" : "merge";
+    if (Array.isArray(body.categories) && body.categories.length) {
+      await importCategories(body.categories);
+    }
     const count = await importPosts(posts, mode);
     const syncWarning = await safeFlushGitSyncQueue();
     revalidateBlogPaths();

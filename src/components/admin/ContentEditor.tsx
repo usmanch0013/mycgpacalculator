@@ -2,6 +2,7 @@
 
 import { forwardRef, useImperativeHandle, useRef, useState, useCallback, useEffect } from "react";
 import BlockInserterModal from "@/components/admin/BlockInserterModal";
+import ImageInsertModal from "@/components/admin/ImageInsertModal";
 import VisualEditor, { type VisualCommand, type VisualEditorHandle } from "@/components/admin/VisualEditor";
 import { convertPastedHtmlToContent, getClipboardHtml } from "@/lib/blog/paste-html";
 import { BLOCK_FORMAT_LABELS, type BlockFormat } from "@/lib/blog/visual-html";
@@ -168,11 +169,77 @@ function prefixLines(
 ) {
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
-  const block = textarea.value.slice(start, end) || placeholder;
-  const lines = block.split("\n").map((line) => `${prefix}${line}`);
-  const inserted = lines.join("\n");
-  const next = textarea.value.slice(0, start) + inserted + textarea.value.slice(end);
-  return { next, cursor: start + inserted.length };
+  const value = textarea.value;
+
+  const applyPrefix = (block: string) =>
+    block
+      .split("\n")
+      .map((line, index) => {
+        const trimmed = line.trim();
+        if (!trimmed) return line;
+        if (prefix.startsWith("1.")) {
+          if (/^\d+\.\s+/.test(trimmed)) return line;
+          return line.replace(/^\s*/, (spaces) => `${spaces}${index + 1}. `);
+        }
+        if (/^-\s+/.test(trimmed)) return line;
+        return line.replace(/^\s*/, (spaces) => `${spaces}- `);
+      })
+      .join("\n");
+
+  if (start !== end) {
+    const block = value.slice(start, end);
+    const inserted = applyPrefix(block);
+    const next = value.slice(0, start) + inserted + value.slice(end);
+    return { next, cursor: start + inserted.length };
+  }
+
+  const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+  let lineEnd = value.indexOf("\n", start);
+  if (lineEnd === -1) lineEnd = value.length;
+
+  const currentLine = value.slice(lineStart, lineEnd).trim();
+  let blockStart = lineStart;
+  let blockEnd = lineEnd;
+
+  if (currentLine.endsWith(":") && currentLine.length <= 160) {
+    blockStart = lineEnd + 1;
+    blockEnd = blockStart;
+    let pos = blockStart;
+    while (pos < value.length) {
+      const nextBreak = value.indexOf("\n", pos);
+      const end = nextBreak === -1 ? value.length : nextBreak;
+      const line = value.slice(pos, end).trim();
+      if (!line) break;
+      if (line.endsWith(":") && line.length <= 160) break;
+      blockEnd = end;
+      if (nextBreak === -1) break;
+      pos = nextBreak + 1;
+    }
+  } else {
+    while (blockStart > 0) {
+      const prevStart = value.lastIndexOf("\n", blockStart - 2) + 1;
+      const prevLine = value.slice(prevStart, blockStart - 1).trim();
+      if (!prevLine || (prevLine.endsWith(":") && prevLine.length <= 160)) break;
+      blockStart = prevStart;
+    }
+
+    let pos = blockEnd + 1;
+    while (pos <= value.length) {
+      const nextBreak = value.indexOf("\n", pos);
+      const end = nextBreak === -1 ? value.length : nextBreak;
+      if (pos >= value.length) break;
+      const line = value.slice(pos, end).trim();
+      if (!line || (line.endsWith(":") && line.length <= 160)) break;
+      blockEnd = end;
+      if (nextBreak === -1) break;
+      pos = nextBreak + 1;
+    }
+  }
+
+  const block = blockStart < blockEnd ? value.slice(blockStart, blockEnd) : value.slice(lineStart, lineEnd) || placeholder;
+  const inserted = applyPrefix(block);
+  const next = value.slice(0, blockStart) + inserted + value.slice(blockEnd);
+  return { next, cursor: blockStart + inserted.length };
 }
 
 export default forwardRef<ContentEditorHandle, ContentEditorProps>(function ContentEditor(
@@ -192,6 +259,7 @@ export default forwardRef<ContentEditorHandle, ContentEditorProps>(function Cont
   const [blockModalTab, setBlockModalTab] = useState<"table" | "faq" | "image" | "html" | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode>("visual");
   const [blockFormat, setBlockFormat] = useState<BlockFormat>("paragraph");
+  const [pendingImageUrl, setPendingImageUrl] = useState("");
 
   useImperativeHandle(ref, () => ({
     flushValue: () => {
@@ -403,16 +471,7 @@ export default forwardRef<ContentEditorHandle, ContentEditorProps>(function Cont
   async function handleImageUpload(file: File) {
     const url = await uploadImageFile(file);
     if (!url) return;
-    const alt = prompt("Image description (alt text)", "Illustration") || "Image";
-
-    if (editorMode === "visual") {
-      visualRef.current?.insertHtml(
-        `<figure class="blog-image"><img src="${url}" alt="${alt}" loading="lazy" /><figcaption>${alt}</figcaption></figure>`
-      );
-      return;
-    }
-
-    insertAtCursor(`\n\n![${alt}](${url})\n\n`);
+    setPendingImageUrl(url);
   }
 
   function handleQuickInsert(html: string) {
@@ -560,6 +619,19 @@ export default forwardRef<ContentEditorHandle, ContentEditorProps>(function Cont
           const file = e.target.files?.[0];
           if (file) handleImageUpload(file);
           e.target.value = "";
+        }}
+      />
+
+      <ImageInsertModal
+        open={Boolean(pendingImageUrl)}
+        url={pendingImageUrl}
+        onClose={() => setPendingImageUrl("")}
+        onInsert={(html) => {
+          if (editorMode === "visual") {
+            visualRef.current?.insertHtml(html);
+            return;
+          }
+          insertAtCursor(`\n\n${html}\n\n`);
         }}
       />
 

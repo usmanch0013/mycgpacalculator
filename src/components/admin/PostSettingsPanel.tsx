@@ -1,6 +1,7 @@
 "use client";
 
-import FeaturedImageUpload from "@/components/admin/FeaturedImageUpload";
+import CategoryPicker from "@/components/admin/CategoryPicker";
+import FeaturedImageUpload, { type FeaturedImageMeta } from "@/components/admin/FeaturedImageUpload";
 import { estimateReadingTime } from "@/lib/blog/markdown";
 import { getSiteHost } from "@/lib/blog/paths";
 import type { PostStatus } from "@/lib/blog/types";
@@ -10,13 +11,15 @@ interface PostSettingsPanelProps {
   author: string;
   slug: string;
   excerpt: string;
-  featuredImage: string;
+  featuredImage: FeaturedImageMeta;
+  categories: string[];
   wordCount: number;
   onStatusChange: (v: PostStatus) => void;
   onAuthorChange: (v: string) => void;
   onSlugChange: (v: string) => void;
   onExcerptChange: (v: string) => void;
-  onFeaturedImageChange: (v: string) => void;
+  onFeaturedImageChange: (v: FeaturedImageMeta) => void;
+  onCategoriesChange: (v: string[]) => void;
   onSlugManual: () => void;
 }
 
@@ -26,12 +29,14 @@ export default function PostSettingsPanel({
   slug,
   excerpt,
   featuredImage,
+  categories,
   wordCount,
   onStatusChange,
   onAuthorChange,
   onSlugChange,
   onExcerptChange,
   onFeaturedImageChange,
+  onCategoriesChange,
   onSlugManual,
 }: PostSettingsPanelProps) {
   const readingMin = estimateReadingTime(wordCount);
@@ -70,6 +75,8 @@ export default function PostSettingsPanel({
         <span>Author</span>
         <input value={author} onChange={(e) => onAuthorChange(e.target.value)} />
       </label>
+
+      <CategoryPicker selected={categories} onChange={onCategoriesChange} />
 
       <div className="wp-side-field">
         <span>Permalink</span>

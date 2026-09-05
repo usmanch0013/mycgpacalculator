@@ -49,6 +49,8 @@ export default function BlockInserterModal({
   const [faqItems, setFaqItems] = useState<FaqItem[]>(DEFAULT_FAQ);
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
+  const [imageTitle, setImageTitle] = useState("");
+  const [imageDescription, setImageDescription] = useState("");
   const [imageAlign, setImageAlign] = useState<"default" | "wide" | "center">("default");
   const [customHtml, setCustomHtml] = useState(HTML_EXAMPLE);
   const [uploading, setUploading] = useState(false);
@@ -221,11 +223,28 @@ export default function BlockInserterModal({
                 </label>
               )}
               <label className="block-modal__field">
-                <span>Alt text / caption</span>
+                <span>Alt text</span>
                 <input
                   value={imageAlt}
                   onChange={(e) => setImageAlt(e.target.value)}
                   placeholder="CGPA grading scale chart"
+                />
+              </label>
+              <label className="block-modal__field">
+                <span>Title</span>
+                <input
+                  value={imageTitle}
+                  onChange={(e) => setImageTitle(e.target.value)}
+                  placeholder="Optional image title"
+                />
+              </label>
+              <label className="block-modal__field">
+                <span>Description</span>
+                <textarea
+                  rows={3}
+                  value={imageDescription}
+                  onChange={(e) => setImageDescription(e.target.value)}
+                  placeholder="Caption shown under the image"
                 />
               </label>
               <label className="block-modal__field">
@@ -243,7 +262,14 @@ export default function BlockInserterModal({
                 type="button"
                 className="admin-btn admin-btn--primary"
                 disabled={!imageUrl.trim()}
-                onClick={() => insertAndClose(buildImageHtml(imageUrl, imageAlt, imageAlign))}
+                onClick={() =>
+                  insertAndClose(
+                    buildImageHtml(imageUrl, imageAlt, imageAlign, {
+                      title: imageTitle,
+                      description: imageDescription,
+                    })
+                  )
+                }
               >
                 Insert image
               </button>

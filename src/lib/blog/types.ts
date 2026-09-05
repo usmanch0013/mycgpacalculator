@@ -1,10 +1,17 @@
 export type PostStatus = "draft" | "published";
 
+export interface BlogCategory {
+  slug: string;
+  name: string;
+}
+
 export interface BlogPost {
   id: string;
   slug: string;
   title: string;
   focusKeyword: string;
+  secondaryKeywords?: string[];
+  categories?: string[];
   metaDescription: string;
   excerpt: string;
   content: string;
@@ -13,12 +20,17 @@ export interface BlogPost {
   updatedAt: string;
   author: string;
   featuredImage?: string;
+  featuredImageAlt?: string;
+  featuredImageTitle?: string;
+  featuredImageDescription?: string;
 }
 
 export interface BlogPostInput {
   slug: string;
   title: string;
   focusKeyword: string;
+  secondaryKeywords?: string[];
+  categories?: string[];
   metaDescription: string;
   excerpt: string;
   content: string;
@@ -26,6 +38,9 @@ export interface BlogPostInput {
   publishedAt?: string;
   author?: string;
   featuredImage?: string;
+  featuredImageAlt?: string;
+  featuredImageTitle?: string;
+  featuredImageDescription?: string;
 }
 
 export type SeoCheckStatus = "good" | "ok" | "bad";

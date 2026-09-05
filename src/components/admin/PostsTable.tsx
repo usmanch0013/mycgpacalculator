@@ -283,6 +283,14 @@ export default function PostsTable({ posts }: { posts: BlogPost[] }) {
                   {
                     excerpt: post.excerpt,
                     featuredImage: post.featuredImage,
+                    secondaryKeywords: post.secondaryKeywords,
+                    currentPostId: post.id,
+                    existingFocusKeywords: posts.map((item) => ({
+                      id: item.id,
+                      keyword: item.focusKeyword,
+                      title: item.title,
+                      status: item.status,
+                    })),
                   }
                 );
                 const busy = busyId === post.id;

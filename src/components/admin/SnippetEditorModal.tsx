@@ -1,5 +1,6 @@
 "use client";
 
+import { hasKeyword, highlightKeyword } from "@/lib/blog/keyword-highlight";
 import { getSiteHost } from "@/lib/blog/paths";
 
 interface SnippetEditorModalProps {
@@ -8,6 +9,7 @@ interface SnippetEditorModalProps {
   title: string;
   slug: string;
   metaDescription: string;
+  focusKeyword?: string;
   onTitleChange: (v: string) => void;
   onSlugChange: (v: string) => void;
   onMetaChange: (v: string) => void;
@@ -25,6 +27,7 @@ export default function SnippetEditorModal({
   title,
   slug,
   metaDescription,
+  focusKeyword = "",
   onTitleChange,
   onSlugChange,
   onMetaChange,
@@ -36,6 +39,8 @@ export default function SnippetEditorModal({
   const metaLen = metaDescription.length;
   const slugLen = slug.length;
   const displaySlug = slug || "your-article-slug";
+  const titleHasKw = hasKeyword(title, focusKeyword);
+  const metaHasKw = hasKeyword(metaDescription, focusKeyword);
 
   return (
     <div className="rm-modal-backdrop" onClick={onClose} role="presentation">
@@ -56,9 +61,11 @@ export default function SnippetEditorModal({
           <p className="rm-modal__preview-label">Google preview</p>
           <div className="serp-preview__card">
             <p className="serp-preview__url">{siteHost}/{displaySlug}</p>
-            <p className="serp-preview__title">{title || "Your SEO title"}</p>
+            <p className="serp-preview__title">
+              {highlightKeyword(title || "Your SEO title", focusKeyword)}
+            </p>
             <p className="serp-preview__desc">
-              {metaDescription || "Your meta description appears here."}
+              {highlightKeyword(metaDescription || "Your meta description appears here.", focusKeyword)}
             </p>
           </div>
         </div>
@@ -80,6 +87,9 @@ export default function SnippetEditorModal({
               </div>
               <span className="rm-bar__count">{titleLen} / 60</span>
             </div>
+            {focusKeyword.trim() && !titleHasKw && (
+              <p className="rm-field__warn">Primary keyword is missing from the SEO title.</p>
+            )}
           </label>
 
           <label className="rm-field">
@@ -124,6 +134,9 @@ export default function SnippetEditorModal({
               </div>
               <span className="rm-bar__count">{metaLen} / 160</span>
             </div>
+            {focusKeyword.trim() && !metaHasKw && (
+              <p className="rm-field__warn">Primary keyword is missing from the meta description.</p>
+            )}
           </label>
         </div>
 

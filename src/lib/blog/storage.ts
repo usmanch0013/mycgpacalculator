@@ -3,7 +3,8 @@ import path from "path";
 import { generateSlug } from "./utils";
 import { validatePostSlug } from "./paths";
 import { blogRelativePath, queueGitDelete, queueGitUpsert } from "./github-sync";
-import type { BlogPost, BlogPostInput } from "./types";
+import { getCategories, normalizeCategorySlugs } from "./categories";
+import type { BlogCategory, BlogPost, BlogPostInput } from "./types";
 
 const BLOG_DIR = path.join(process.cwd(), "content/blog");
 
@@ -54,6 +55,32 @@ export async function getPostById(id: string): Promise<BlogPost | null> {
   return all.find((p) => p.id === id) ?? null;
 }
 
+const MAX_SECONDARY_KEYWORDS = 6;
+
+export function normalizeSecondaryKeywords(
+  keywords: unknown,
+  primary = ""
+): string[] {
+  if (!Array.isArray(keywords)) return [];
+
+  const seen = new Set<string>();
+  const primaryKey = primary.trim().toLowerCase();
+  const cleaned: string[] = [];
+
+  for (const item of keywords) {
+    if (typeof item !== "string") continue;
+    const value = item.trim().replace(/\s+/g, " ");
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (key === primaryKey || seen.has(key)) continue;
+    seen.add(key);
+    cleaned.push(value);
+    if (cleaned.length >= MAX_SECONDARY_KEYWORDS) break;
+  }
+
+  return cleaned;
+}
+
 async function uniqueDraftSlug(preferred: string): Promise<string> {
   const base = preferred.trim() || `draft-${Date.now().toString(36)}`;
   let slug = base;
@@ -81,6 +108,7 @@ export async function createPost(input: BlogPostInput): Promise<BlogPost> {
     slug,
     title: input.title.trim(),
     focusKeyword: input.focusKeyword.trim(),
+    secondaryKeywords: normalizeSecondaryKeywords(input.secondaryKeywords, input.focusKeyword),
     metaDescription: input.metaDescription.trim(),
     excerpt: input.excerpt.trim(),
     content: input.content,
@@ -89,6 +117,10 @@ export async function createPost(input: BlogPostInput): Promise<BlogPost> {
     updatedAt: now,
     author: input.author?.trim() || "CGPA Calculator Pro",
     featuredImage: input.featuredImage?.trim() || undefined,
+    featuredImageAlt: input.featuredImageAlt?.trim() || undefined,
+    featuredImageTitle: input.featuredImageTitle?.trim() || undefined,
+    featuredImageDescription: input.featuredImageDescription?.trim() || undefined,
+    categories: normalizeCategorySlugs(input.categories),
   };
 
   await fs.writeFile(postPath(slug), JSON.stringify(post, null, 2), "utf8");
@@ -123,6 +155,13 @@ export async function updatePost(
     title: input.title !== undefined ? input.title.trim() : existing.title,
     focusKeyword:
       input.focusKeyword !== undefined ? input.focusKeyword.trim() : existing.focusKeyword,
+    secondaryKeywords:
+      input.secondaryKeywords !== undefined
+        ? normalizeSecondaryKeywords(
+            input.secondaryKeywords,
+            input.focusKeyword !== undefined ? input.focusKeyword : existing.focusKeyword
+          )
+        : normalizeSecondaryKeywords(existing.secondaryKeywords, existing.focusKeyword),
     metaDescription:
       input.metaDescription !== undefined ? input.metaDescription.trim() : existing.metaDescription,
     excerpt: input.excerpt !== undefined ? input.excerpt.trim() : existing.excerpt,
@@ -135,6 +174,22 @@ export async function updatePost(
       input.featuredImage !== undefined
         ? input.featuredImage.trim() || undefined
         : existing.featuredImage,
+    featuredImageAlt:
+      input.featuredImageAlt !== undefined
+        ? input.featuredImageAlt.trim() || undefined
+        : existing.featuredImageAlt,
+    featuredImageTitle:
+      input.featuredImageTitle !== undefined
+        ? input.featuredImageTitle.trim() || undefined
+        : existing.featuredImageTitle,
+    featuredImageDescription:
+      input.featuredImageDescription !== undefined
+        ? input.featuredImageDescription.trim() || undefined
+        : existing.featuredImageDescription,
+    categories:
+      input.categories !== undefined
+        ? normalizeCategorySlugs(input.categories)
+        : normalizeCategorySlugs(existing.categories),
   };
 
   await fs.writeFile(postPath(newSlug), JSON.stringify(post, null, 2), "utf8");
@@ -156,12 +211,17 @@ export async function duplicatePost(id: string): Promise<BlogPost> {
     title: existing.title.trim() ? `${existing.title} (Copy)` : "Untitled (Copy)",
     slug: `${existing.slug}-copy`,
     focusKeyword: existing.focusKeyword,
+    secondaryKeywords: existing.secondaryKeywords,
     metaDescription: existing.metaDescription,
     excerpt: existing.excerpt,
     content: existing.content,
     status: "draft",
     author: existing.author,
     featuredImage: existing.featuredImage,
+    featuredImageAlt: existing.featuredImageAlt,
+    featuredImageTitle: existing.featuredImageTitle,
+    featuredImageDescription: existing.featuredImageDescription,
+    categories: existing.categories,
   });
 }
 
@@ -169,14 +229,16 @@ export interface BlogBackupPayload {
   version: 1;
   exportedAt: string;
   posts: BlogPost[];
+  categories?: BlogCategory[];
 }
 
 export async function exportAllPosts(): Promise<BlogBackupPayload> {
-  const posts = await getAllPosts();
+  const [posts, categories] = await Promise.all([getAllPosts(), getCategories()]);
   return {
     version: 1,
     exportedAt: new Date().toISOString(),
     posts,
+    categories,
   };
 }
 
@@ -210,6 +272,7 @@ export async function importPosts(
       slug: raw.slug.trim().toLowerCase(),
       title: raw.title?.trim() ?? "",
       focusKeyword: raw.focusKeyword?.trim() ?? "",
+      secondaryKeywords: normalizeSecondaryKeywords(raw.secondaryKeywords, raw.focusKeyword),
       metaDescription: raw.metaDescription?.trim() ?? "",
       excerpt: raw.excerpt?.trim() ?? "",
       content: raw.content,
@@ -218,6 +281,10 @@ export async function importPosts(
       updatedAt: raw.updatedAt || new Date().toISOString(),
       author: raw.author?.trim() || "CGPA Calculator Pro",
       featuredImage: raw.featuredImage?.trim() || undefined,
+      featuredImageAlt: raw.featuredImageAlt?.trim() || undefined,
+      featuredImageTitle: raw.featuredImageTitle?.trim() || undefined,
+      featuredImageDescription: raw.featuredImageDescription?.trim() || undefined,
+      categories: normalizeCategorySlugs(raw.categories),
     };
 
     if (mode === "merge") {

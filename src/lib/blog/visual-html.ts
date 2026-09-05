@@ -1,4 +1,5 @@
 import { renderMarkdown } from "@/lib/blog/markdown";
+import { normalizeArticleHtml } from "@/lib/blog/article-html";
 
 export function sourceToVisualHtml(source: string): string {
   if (!source.trim()) return "<p><br></p>";
@@ -12,6 +13,12 @@ export function visualHtmlToSource(html: string): string {
     .replace(/<p><br><\/p>/gi, "")
     .replace(/<br class="Apple-interchange-newline">/gi, "")
     .trim();
+}
+
+export function visualHtmlToStoredSource(html: string): string {
+  const cleaned = visualHtmlToSource(html);
+  if (!cleaned) return "";
+  return normalizeArticleHtml(cleaned);
 }
 
 export type BlockFormat = "paragraph" | "h2" | "h3" | "quote" | "pullquote" | "callout";
@@ -331,6 +338,163 @@ function unwrapList(list: HTMLElement) {
   list.remove();
 }
 
+function isIntroParagraph(el: HTMLElement): boolean {
+  const text = (el.textContent || "").trim();
+  return text.endsWith(":") && text.length <= 160;
+}
+
+function isListCandidateBlock(el: HTMLElement, root: HTMLElement): boolean {
+  if (el.tagName === "LI") return true;
+  if (el.parentElement !== root) return false;
+  return el.tagName === "P" || el.tagName === "DIV";
+}
+
+function splitBlockIntoListItemParts(block: HTMLElement): string[] {
+  if (block.tagName === "LI") {
+    return [block.innerHTML.trim() || "<br>"];
+  }
+
+  if (block.tagName === "UL" || block.tagName === "OL") {
+    return Array.from(block.querySelectorAll(":scope > li")).map(
+      (li) => (li as HTMLElement).innerHTML.trim() || "<br>"
+    );
+  }
+
+  const inner = block.innerHTML.trim() || "<br>";
+  const brParts = inner
+    .split(/<br\s*\/?>/i)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (brParts.length >= 2) return brParts;
+
+  const childBlocks = Array.from(block.children).filter((child) => {
+    const tag = child.tagName;
+    return tag === "DIV" || tag === "P";
+  }) as HTMLElement[];
+
+  if (childBlocks.length >= 2) {
+    return childBlocks.map((child) => child.innerHTML.trim()).filter(Boolean);
+  }
+
+  return [inner];
+}
+
+function findParagraphRun(block: HTMLElement, root: HTMLElement): HTMLElement[] {
+  if (block.tagName === "LI") {
+    const list = block.parentElement;
+    if (list && (list.tagName === "UL" || list.tagName === "OL")) {
+      return Array.from(list.children).filter((child) => child.tagName === "LI") as HTMLElement[];
+    }
+    return [block];
+  }
+
+  if (block.parentElement !== root || !isListCandidateBlock(block, root)) {
+    return [block];
+  }
+
+  let first = block;
+  while (first.previousElementSibling) {
+    const prev = first.previousElementSibling as HTMLElement;
+    if (!isListCandidateBlock(prev, root)) break;
+    const text = (prev.textContent || "").trim();
+    if (!text) break;
+    if (isIntroParagraph(prev)) break;
+    first = prev;
+  }
+
+  const run: HTMLElement[] = [];
+  let current: Element | null = first;
+  while (current && current.parentElement === root && isListCandidateBlock(current as HTMLElement, root)) {
+    const el = current as HTMLElement;
+    const text = (el.textContent || "").trim();
+    if (!text) break;
+    if (run.length > 0 && isIntroParagraph(el)) break;
+    run.push(el);
+    current = current.nextElementSibling;
+  }
+
+  if (run.length > 1 && isIntroParagraph(run[0])) {
+    return run.slice(1);
+  }
+
+  return run.length ? run : [block];
+}
+
+function gatherBlocksForListConversion(selection: Selection, root: HTMLElement): HTMLElement[] {
+  const selected = getTopLevelBlocksInSelection(selection, root).filter(
+    (block) => block.tagName !== "UL" && block.tagName !== "OL"
+  );
+
+  if (selected.length > 1) return selected;
+
+  const anchorBlock = selected[0] || getBlockElement(selection.anchorNode, root);
+  if (!anchorBlock) return [];
+
+  if (anchorBlock.parentElement === root && isIntroParagraph(anchorBlock)) {
+    const following: HTMLElement[] = [];
+    let next = anchorBlock.nextElementSibling;
+    while (next && next.parentElement === root && isListCandidateBlock(next as HTMLElement, root)) {
+      const text = (next.textContent || "").trim();
+      if (!text) break;
+      if (isIntroParagraph(next as HTMLElement)) break;
+      following.push(next as HTMLElement);
+      next = next.nextElementSibling;
+    }
+    return following.length ? following : [anchorBlock];
+  }
+
+  return findParagraphRun(anchorBlock, root);
+}
+
+function normalizeNativeLists(root: HTMLElement, ordered: boolean) {
+  root.querySelectorAll("ul, ol").forEach((listEl) => {
+    listEl.classList.add("blog-list");
+    if (ordered || listEl.tagName === "OL") {
+      listEl.classList.add("blog-list--ordered");
+    } else {
+      listEl.classList.remove("blog-list--ordered");
+    }
+  });
+}
+
+export function handleListEnterKey(editorRoot: HTMLElement): boolean {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return false;
+
+  const block = getBlockElement(selection.anchorNode, editorRoot);
+  if (!block || block.tagName !== "LI") return false;
+
+  const list = block.parentElement;
+  if (!list || (list.tagName !== "UL" && list.tagName !== "OL")) return false;
+
+  const range = selection.getRangeAt(0);
+  const afterRange = document.createRange();
+  afterRange.setStart(range.startContainer, range.startOffset);
+  afterRange.setEndAfter(block.lastChild || block);
+
+  const afterFragment = afterRange.extractContents();
+  const newLi = document.createElement("li");
+  newLi.appendChild(afterFragment);
+  if (!newLi.innerHTML.trim()) newLi.innerHTML = "<br>";
+
+  if (block.nextSibling) {
+    list.insertBefore(newLi, block.nextSibling);
+  } else {
+    list.appendChild(newLi);
+  }
+
+  if (!block.innerHTML.trim()) block.innerHTML = "<br>";
+
+  selection.removeAllRanges();
+  const newRange = document.createRange();
+  newRange.selectNodeContents(newLi);
+  newRange.collapse(true);
+  selection.addRange(newRange);
+
+  return true;
+}
+
 function getTopLevelBlocksInSelection(selection: Selection, root: HTMLElement): HTMLElement[] {
   const range = selection.getRangeAt(0);
   const blocks: HTMLElement[] = [];
@@ -394,9 +558,10 @@ export function toggleList(ordered: boolean, editorRoot: HTMLElement) {
     return;
   }
 
-  const blocks = getTopLevelBlocksInSelection(selection, editorRoot);
+  const blocks = gatherBlocksForListConversion(selection, editorRoot);
   if (!blocks.length) {
     document.execCommand(ordered ? "insertOrderedList" : "insertUnorderedList");
+    normalizeNativeLists(editorRoot, ordered);
     return;
   }
 
@@ -406,17 +571,11 @@ export function toggleList(ordered: boolean, editorRoot: HTMLElement) {
   const parent = editorRoot;
 
   blocks.forEach((block) => {
-    const item = document.createElement("li");
-    if (block.tagName === "LI") {
-      item.innerHTML = block.innerHTML;
-    } else if (block.tagName === "UL" || block.tagName === "OL") {
-      item.innerHTML = Array.from(block.querySelectorAll(":scope > li"))
-        .map((li) => (li as HTMLElement).innerHTML)
-        .join("") || block.innerHTML;
-    } else {
-      item.innerHTML = block.innerHTML.trim() || "<br>";
-    }
-    list.appendChild(item);
+    splitBlockIntoListItemParts(block).forEach((part) => {
+      const item = document.createElement("li");
+      item.innerHTML = part || "<br>";
+      list.appendChild(item);
+    });
   });
 
   parent.insertBefore(list, firstBlock);
