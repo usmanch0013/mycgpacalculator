@@ -2,7 +2,7 @@ import "./globals.css";
 import { Inter } from "next/font/google";
 import JsonLd from "@/components/JsonLd";
 import CookieConsent from "@/components/CookieConsent";
-import AdSenseScript from "@/components/AdSenseScript";
+import { ADSENSE_CLIENTS, adsenseScriptSrc } from "@/lib/adsense";
 import {
   SITE_NAME,
   SITE_URL,
@@ -72,9 +72,18 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${inter.className} ${inter.variable}`}>
+      <head>
+        {ADSENSE_CLIENTS.map((client) => (
+          <script
+            key={client}
+            async
+            src={adsenseScriptSrc(client)}
+            crossOrigin="anonymous"
+          />
+        ))}
+      </head>
       <body>
         <JsonLd data={GLOBAL_JSON_LD} />
-        <AdSenseScript />
         {children}
         <CookieConsent />
       </body>
