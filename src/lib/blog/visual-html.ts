@@ -325,126 +325,176 @@ function findParentList(node: Node | null, root: HTMLElement): HTMLElement | nul
   return null;
 }
 
-function unwrapList(list: HTMLElement) {
-  const parent = list.parentNode;
-  if (!parent) return;
+function createListElement(ordered: boolean): HTMLElement {
+  const list = document.createElement(ordered ? "ol" : "ul");
+  list.className = ordered ? "blog-list blog-list--ordered" : "blog-list";
+  return list;
+}
 
-  const items = Array.from(list.children).filter((child) => child.tagName === "LI");
-  items.forEach((item) => {
+function blockToListItem(block: HTMLElement): HTMLElement {
+  const item = document.createElement("li");
+  item.innerHTML = block.innerHTML.trim() || "<br>";
+  return item;
+}
+
+function unwrapListItems(list: HTMLElement, items: HTMLElement[]) {
+  rewriteListChildren(list, items, (child, fragment) => {
     const paragraph = document.createElement("p");
-    paragraph.innerHTML = (item as HTMLElement).innerHTML.trim() || "<br>";
-    parent.insertBefore(paragraph, list);
+    paragraph.innerHTML = child.innerHTML.trim() || "<br>";
+    fragment.appendChild(paragraph);
   });
-  list.remove();
 }
 
-function isIntroParagraph(el: HTMLElement): boolean {
-  const text = (el.textContent || "").trim();
-  return text.endsWith(":") && text.length <= 160;
-}
-
-function isListCandidateBlock(el: HTMLElement, root: HTMLElement): boolean {
-  if (el.tagName === "LI") return true;
-  if (el.parentElement !== root) return false;
-  return el.tagName === "P" || el.tagName === "DIV";
-}
-
-function splitBlockIntoListItemParts(block: HTMLElement): string[] {
-  if (block.tagName === "LI") {
-    return [block.innerHTML.trim() || "<br>"];
-  }
-
-  if (block.tagName === "UL" || block.tagName === "OL") {
-    return Array.from(block.querySelectorAll(":scope > li")).map(
-      (li) => (li as HTMLElement).innerHTML.trim() || "<br>"
-    );
-  }
-
-  const inner = block.innerHTML.trim() || "<br>";
-  const brParts = inner
-    .split(/<br\s*\/?>/i)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (brParts.length >= 2) return brParts;
-
-  const childBlocks = Array.from(block.children).filter((child) => {
-    const tag = child.tagName;
-    return tag === "DIV" || tag === "P";
-  }) as HTMLElement[];
-
-  if (childBlocks.length >= 2) {
-    return childBlocks.map((child) => child.innerHTML.trim()).filter(Boolean);
-  }
-
-  return [inner];
-}
-
-function findParagraphRun(block: HTMLElement, root: HTMLElement): HTMLElement[] {
-  if (block.tagName === "LI") {
-    const list = block.parentElement;
-    if (list && (list.tagName === "UL" || list.tagName === "OL")) {
-      return Array.from(list.children).filter((child) => child.tagName === "LI") as HTMLElement[];
+function retargetListItems(list: HTMLElement, items: HTMLElement[], ordered: boolean) {
+  rewriteListChildren(list, items, (child, fragment, state) => {
+    if (!state.otherList) {
+      state.otherList = createListElement(ordered);
+      fragment.appendChild(state.otherList);
     }
-    return [block];
+    state.otherList.appendChild(child.cloneNode(true));
+  });
+}
+
+function rewriteListChildren(
+  list: HTMLElement,
+  items: HTMLElement[],
+  handleSelected: (
+    child: HTMLElement,
+    fragment: DocumentFragment,
+    state: { otherList: HTMLElement | null }
+  ) => void
+) {
+  const itemSet = new Set(items);
+  const children = Array.from(list.children) as HTMLElement[];
+  const fragment = document.createDocumentFragment();
+  const state = { otherList: null as HTMLElement | null };
+  let currentList: HTMLElement | null = null;
+
+  children.forEach((child) => {
+    if (child.tagName !== "LI") return;
+    if (itemSet.has(child)) {
+      currentList = null;
+      handleSelected(child, fragment, state);
+      return;
+    }
+
+    state.otherList = null;
+    if (!currentList) {
+      currentList = document.createElement(list.tagName);
+      currentList.className = list.className;
+      fragment.appendChild(currentList);
+    }
+    currentList.appendChild(child.cloneNode(true));
+  });
+
+  list.replaceWith(fragment);
+}
+
+function isBreakNode(node: Node): boolean {
+  return node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === "BR";
+}
+
+function isNestedBlock(node: Node): node is HTMLElement {
+  if (node.nodeType !== Node.ELEMENT_NODE) return false;
+  return ["P", "DIV", "H2", "H3", "BLOCKQUOTE", "UL", "OL"].includes((node as HTMLElement).tagName);
+}
+
+function splitBlockChildLines(block: HTMLElement): Node[][] {
+  const lines: Node[][] = [[]];
+  Array.from(block.childNodes).forEach((node) => {
+    if (isBreakNode(node)) {
+      lines.push([]);
+      return;
+    }
+    if (isNestedBlock(node)) {
+      if (lines[lines.length - 1].length) lines.push([]);
+      lines[lines.length - 1].push(node);
+      lines.push([]);
+      return;
+    }
+    lines[lines.length - 1].push(node);
+  });
+  while (lines.length > 1 && lines[lines.length - 1].length === 0) {
+    lines.pop();
+  }
+  return lines;
+}
+
+function lineContainsNode(nodes: Node[], target: Node | null): boolean {
+  if (!target) return false;
+  return nodes.some((node) => node === target || (node.nodeType === Node.ELEMENT_NODE && node.contains(target)));
+}
+
+function createParagraphFromNodes(nodes: Node[]): HTMLElement {
+  const paragraph = document.createElement("p");
+  nodes.forEach((node) => {
+    if (isNestedBlock(node) && node.tagName === "P") {
+      while (node.firstChild) paragraph.appendChild(node.firstChild);
+      return;
+    }
+    paragraph.appendChild(node);
+  });
+  if (!paragraph.innerHTML.trim()) paragraph.innerHTML = "<br>";
+  return paragraph;
+}
+
+function extractCaretLineAsBlock(block: HTMLElement, selection: Selection): HTMLElement {
+  const lines = splitBlockChildLines(block);
+  if (lines.length <= 1) return block;
+
+  const range = selection.getRangeAt(0);
+  let lineIndex = lines.findIndex((nodes) => lineContainsNode(nodes, range.startContainer));
+  if (lineIndex < 0 && range.startContainer === block) {
+    let childOffset = 0;
+    lineIndex = 0;
+    for (let i = 0; i < lines.length; i += 1) {
+      const endOffset = childOffset + lines[i].length;
+      if (range.startOffset <= endOffset) {
+        lineIndex = i;
+        break;
+      }
+      childOffset = endOffset + 1;
+      lineIndex = i;
+    }
+  } else if (lineIndex < 0) {
+    lineIndex = 0;
   }
 
-  if (block.parentElement !== root || !isListCandidateBlock(block, root)) {
-    return [block];
-  }
+  const parent = block.parentNode;
+  if (!parent) return block;
 
-  let first = block;
-  while (first.previousElementSibling) {
-    const prev = first.previousElementSibling as HTMLElement;
-    if (!isListCandidateBlock(prev, root)) break;
-    const text = (prev.textContent || "").trim();
-    if (!text) break;
-    if (isIntroParagraph(prev)) break;
-    first = prev;
-  }
+  const created = lines.map((nodes) => createParagraphFromNodes(nodes));
+  created.forEach((paragraph) => parent.insertBefore(paragraph, block));
+  block.remove();
 
-  const run: HTMLElement[] = [];
-  let current: Element | null = first;
-  while (current && current.parentElement === root && isListCandidateBlock(current as HTMLElement, root)) {
-    const el = current as HTMLElement;
-    const text = (el.textContent || "").trim();
-    if (!text) break;
-    if (run.length > 0 && isIntroParagraph(el)) break;
-    run.push(el);
-    current = current.nextElementSibling;
-  }
-
-  if (run.length > 1 && isIntroParagraph(run[0])) {
-    return run.slice(1);
-  }
-
-  return run.length ? run : [block];
+  const current = created[lineIndex];
+  placeCursorAtEnd(current);
+  return current;
 }
 
 function gatherBlocksForListConversion(selection: Selection, root: HTMLElement): HTMLElement[] {
-  const selected = getTopLevelBlocksInSelection(selection, root).filter(
-    (block) => block.tagName !== "UL" && block.tagName !== "OL"
-  );
+  if (!selection.rangeCount) return [];
 
-  if (selected.length > 1) return selected;
+  const range = selection.getRangeAt(0);
+  const caretBlock = getBlockElement(selection.anchorNode, root);
 
-  const anchorBlock = selected[0] || getBlockElement(selection.anchorNode, root);
-  if (!anchorBlock) return [];
-
-  if (anchorBlock.parentElement === root && isIntroParagraph(anchorBlock)) {
-    const following: HTMLElement[] = [];
-    let next = anchorBlock.nextElementSibling;
-    while (next && next.parentElement === root && isListCandidateBlock(next as HTMLElement, root)) {
-      const text = (next.textContent || "").trim();
-      if (!text) break;
-      if (isIntroParagraph(next as HTMLElement)) break;
-      following.push(next as HTMLElement);
-      next = next.nextElementSibling;
-    }
-    return following.length ? following : [anchorBlock];
+  if (range.collapsed) {
+    if (!caretBlock || caretBlock.tagName === "UL" || caretBlock.tagName === "OL") return [];
+    if (caretBlock.tagName === "LI") return [caretBlock];
+    return [extractCaretLineAsBlock(caretBlock, selection)];
   }
 
-  return findParagraphRun(anchorBlock, root);
+  const selected = getTopLevelBlocksInSelection(selection, root).flatMap((block) => {
+    if (block.tagName === "DIV" && block.parentElement === root) {
+      const inner = getBlockElement(selection.anchorNode, block) || caretBlock;
+      return inner && inner !== block ? [inner] : [];
+    }
+    return [block];
+  }).filter((block) => block.tagName !== "UL" && block.tagName !== "OL");
+
+  if (selected.length) return selected;
+  if (!caretBlock || caretBlock.tagName === "UL" || caretBlock.tagName === "OL") return [];
+  return [caretBlock];
 }
 
 function normalizeNativeLists(root: HTMLElement, ordered: boolean) {
@@ -458,6 +508,39 @@ function normalizeNativeLists(root: HTMLElement, ordered: boolean) {
   });
 }
 
+function placeCursorAtStart(el: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection) return;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function splitBlockAtCaret(block: HTMLElement, nextTag: string): HTMLElement | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+
+  if (!block.lastChild) block.innerHTML = "<br>";
+
+  const range = selection.getRangeAt(0);
+  const afterRange = document.createRange();
+  afterRange.setStart(range.startContainer, range.startOffset);
+  afterRange.setEnd(block, block.childNodes.length);
+
+  const next = document.createElement(nextTag);
+  next.appendChild(afterRange.extractContents());
+  if (!next.innerHTML.trim()) next.innerHTML = "<br>";
+  if (!block.innerHTML.trim()) block.innerHTML = "<br>";
+
+  const parent = block.parentNode;
+  if (!parent) return null;
+  parent.insertBefore(next, block.nextSibling);
+  placeCursorAtStart(next);
+  return next;
+}
+
 export function handleListEnterKey(editorRoot: HTMLElement): boolean {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return false;
@@ -468,31 +551,31 @@ export function handleListEnterKey(editorRoot: HTMLElement): boolean {
   const list = block.parentElement;
   if (!list || (list.tagName !== "UL" && list.tagName !== "OL")) return false;
 
-  const range = selection.getRangeAt(0);
-  const afterRange = document.createRange();
-  afterRange.setStart(range.startContainer, range.startOffset);
-  afterRange.setEndAfter(block.lastChild || block);
-
-  const afterFragment = afterRange.extractContents();
-  const newLi = document.createElement("li");
-  newLi.appendChild(afterFragment);
-  if (!newLi.innerHTML.trim()) newLi.innerHTML = "<br>";
-
-  if (block.nextSibling) {
-    list.insertBefore(newLi, block.nextSibling);
-  } else {
-    list.appendChild(newLi);
+  if (!block.textContent?.trim()) {
+    const paragraph = document.createElement("p");
+    paragraph.innerHTML = "<br>";
+    list.parentNode?.insertBefore(paragraph, list.nextSibling);
+    if (block.previousElementSibling) {
+      block.remove();
+    }
+    if (!list.querySelector("li")) list.remove();
+    placeCursorAtStart(paragraph);
+    return true;
   }
 
-  if (!block.innerHTML.trim()) block.innerHTML = "<br>";
+  return Boolean(splitBlockAtCaret(block, "li"));
+}
 
-  selection.removeAllRanges();
-  const newRange = document.createRange();
-  newRange.selectNodeContents(newLi);
-  newRange.collapse(true);
-  selection.addRange(newRange);
+export function handleVisualEnterKey(editorRoot: HTMLElement): boolean {
+  if (handleListEnterKey(editorRoot)) return true;
 
-  return true;
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return false;
+
+  const block = getBlockElement(selection.anchorNode, editorRoot);
+  if (!block || block.tagName === "PRE") return false;
+
+  return Boolean(splitBlockAtCaret(block, "p"));
 }
 
 function getTopLevelBlocksInSelection(selection: Selection, root: HTMLElement): HTMLElement[] {
@@ -535,49 +618,66 @@ function getTopLevelBlocksInSelection(selection: Selection, root: HTMLElement): 
   return blocks;
 }
 
+function isMatchingList(el: HTMLElement | null, ordered: boolean): el is HTMLElement {
+  return Boolean(el && el.tagName === (ordered ? "OL" : "UL"));
+}
+
 export function toggleList(ordered: boolean, editorRoot: HTMLElement) {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return;
 
+  const saved = selection.getRangeAt(0).cloneRange();
   editorRoot.focus();
+  selection.removeAllRanges();
+  selection.addRange(saved);
 
-  const anchorList = findParentList(selection.anchorNode, editorRoot);
-  const focusList = findParentList(selection.focusNode, editorRoot);
-  const activeList = anchorList && anchorList === focusList ? anchorList : anchorList || focusList;
+  const blocks = gatherBlocksForListConversion(selection, editorRoot);
+  const listItems = blocks.filter((block) => block.tagName === "LI");
 
-  if (activeList) {
-    const isOrdered = activeList.tagName === "OL";
+  if (listItems.length) {
+    const list = findParentList(listItems[0], editorRoot);
+    if (!list) return;
+    const isOrdered = list.tagName === "OL";
     if (ordered === isOrdered) {
-      unwrapList(activeList);
+      unwrapListItems(list, listItems);
       return;
     }
-    const replacement = document.createElement(ordered ? "ol" : "ul");
-    replacement.className = ordered ? "blog-list blog-list--ordered" : "blog-list";
-    replacement.innerHTML = activeList.innerHTML;
-    activeList.replaceWith(replacement);
+    retargetListItems(list, listItems, ordered);
     return;
   }
 
-  const blocks = gatherBlocksForListConversion(selection, editorRoot);
   if (!blocks.length) {
     document.execCommand(ordered ? "insertOrderedList" : "insertUnorderedList");
     normalizeNativeLists(editorRoot, ordered);
     return;
   }
 
-  const list = document.createElement(ordered ? "ol" : "ul");
-  list.className = ordered ? "blog-list blog-list--ordered" : "blog-list";
+  const list = createListElement(ordered);
   const firstBlock = blocks[0];
-  const parent = editorRoot;
+  const lastBlock = blocks[blocks.length - 1];
+  blocks.forEach((block) => list.appendChild(blockToListItem(block)));
 
-  blocks.forEach((block) => {
-    splitBlockIntoListItemParts(block).forEach((part) => {
-      const item = document.createElement("li");
-      item.innerHTML = part || "<br>";
-      list.appendChild(item);
-    });
-  });
+  const prev = firstBlock.previousElementSibling as HTMLElement | null;
+  const next = lastBlock.nextElementSibling as HTMLElement | null;
 
-  parent.insertBefore(list, firstBlock);
+  if (isMatchingList(prev, ordered)) {
+    while (list.firstChild) prev.appendChild(list.firstChild);
+    blocks.forEach((block) => block.remove());
+    if (isMatchingList(next, ordered)) {
+      while (next.firstChild) prev.appendChild(next.firstChild);
+      next.remove();
+    }
+    placeCursorAtEnd(prev.querySelector("li:last-child") || prev);
+    return;
+  }
+
+  editorRoot.insertBefore(list, firstBlock);
   blocks.forEach((block) => block.remove());
+
+  if (isMatchingList(next, ordered)) {
+    while (next.firstChild) list.appendChild(next.firstChild);
+    next.remove();
+  }
+
+  placeCursorAtEnd(list.querySelector("li") || list);
 }

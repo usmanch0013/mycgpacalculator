@@ -196,50 +196,10 @@ function prefixLines(
   const lineStart = value.lastIndexOf("\n", start - 1) + 1;
   let lineEnd = value.indexOf("\n", start);
   if (lineEnd === -1) lineEnd = value.length;
-
-  const currentLine = value.slice(lineStart, lineEnd).trim();
-  let blockStart = lineStart;
-  let blockEnd = lineEnd;
-
-  if (currentLine.endsWith(":") && currentLine.length <= 160) {
-    blockStart = lineEnd + 1;
-    blockEnd = blockStart;
-    let pos = blockStart;
-    while (pos < value.length) {
-      const nextBreak = value.indexOf("\n", pos);
-      const end = nextBreak === -1 ? value.length : nextBreak;
-      const line = value.slice(pos, end).trim();
-      if (!line) break;
-      if (line.endsWith(":") && line.length <= 160) break;
-      blockEnd = end;
-      if (nextBreak === -1) break;
-      pos = nextBreak + 1;
-    }
-  } else {
-    while (blockStart > 0) {
-      const prevStart = value.lastIndexOf("\n", blockStart - 2) + 1;
-      const prevLine = value.slice(prevStart, blockStart - 1).trim();
-      if (!prevLine || (prevLine.endsWith(":") && prevLine.length <= 160)) break;
-      blockStart = prevStart;
-    }
-
-    let pos = blockEnd + 1;
-    while (pos <= value.length) {
-      const nextBreak = value.indexOf("\n", pos);
-      const end = nextBreak === -1 ? value.length : nextBreak;
-      if (pos >= value.length) break;
-      const line = value.slice(pos, end).trim();
-      if (!line || (line.endsWith(":") && line.length <= 160)) break;
-      blockEnd = end;
-      if (nextBreak === -1) break;
-      pos = nextBreak + 1;
-    }
-  }
-
-  const block = blockStart < blockEnd ? value.slice(blockStart, blockEnd) : value.slice(lineStart, lineEnd) || placeholder;
-  const inserted = applyPrefix(block);
-  const next = value.slice(0, blockStart) + inserted + value.slice(blockEnd);
-  return { next, cursor: blockStart + inserted.length };
+  const currentLine = value.slice(lineStart, lineEnd) || placeholder;
+  const inserted = applyPrefix(currentLine);
+  const next = value.slice(0, lineStart) + inserted + value.slice(lineEnd);
+  return { next, cursor: lineStart + inserted.length };
 }
 
 export default forwardRef<ContentEditorHandle, ContentEditorProps>(function ContentEditor(
