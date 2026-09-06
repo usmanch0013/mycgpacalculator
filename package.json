@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync-blog-admin": "node scripts/sync-blog-admin-template.mjs"
   },
   "dependencies": {
     "marked": "^15.0.12",

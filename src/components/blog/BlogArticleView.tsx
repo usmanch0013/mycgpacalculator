@@ -3,6 +3,7 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import { estimateReadingTime } from "@/lib/blog/markdown";
 import { analyzeSeo } from "@/lib/blog/seo-score";
 import { getPostPath } from "@/lib/blog/paths";
+import { BLOG_CONFIG } from "@/lib/blog/config";
 import "@/styles/blog-public.css";
 
 interface BlogArticleViewProps {
@@ -50,7 +51,7 @@ export default function BlogArticleView({
   });
   const readingMin = estimateReadingTime(seo.wordCount);
   const displayTitle = title.trim() || "Untitled article";
-  const displayAuthor = author.trim() || "CGPA Calculator Pro";
+  const displayAuthor = author.trim() || BLOG_CONFIG.defaultAuthor;
   const formattedDate = new Date(publishedAt).toLocaleDateString("en-US", {
     day: "numeric",
     month: "long",

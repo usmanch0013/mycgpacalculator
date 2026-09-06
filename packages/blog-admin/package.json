@@ -1,0 +1,26 @@
+{
+  "name": "@usmanch/next-blog-admin",
+  "version": "1.0.0",
+  "description": "Portable Rank Math-style blog admin for Next.js App Router — env-based branding per domain",
+  "type": "module",
+  "bin": {
+    "install-blog-admin": "./bin/install.mjs"
+  },
+  "files": [
+    "bin",
+    "template",
+    "README.md",
+    ".env.example"
+  ],
+  "keywords": [
+    "nextjs",
+    "blog",
+    "cms",
+    "admin",
+    "seo"
+  ],
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18"
+  }
+}

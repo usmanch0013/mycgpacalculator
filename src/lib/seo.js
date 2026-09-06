@@ -1,10 +1,22 @@
 /** @typedef {{ question: string, answer: string }} FaqItem */
 
+import { deriveSiteNameFromUrl } from './blog/admin-config';
+
 export const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || 'https://cgpacalculatorpro.com';
 
-export const SITE_NAME = 'CGPA Calculator Pro';
-export const SITE_EMAIL = 'hello@cgpacalculatorpro.com';
+function siteHostname(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, '');
+  } catch {
+    return 'localhost';
+  }
+}
+
+export const SITE_NAME =
+  process.env.NEXT_PUBLIC_SITE_NAME?.trim() || deriveSiteNameFromUrl(SITE_URL);
+export const SITE_EMAIL =
+  process.env.SITE_EMAIL?.trim() || `hello@${siteHostname(SITE_URL)}`;
 export const SITE_TAGLINE = 'Free CGPA & GPA Calculator for Students Worldwide';
 export const DEFAULT_OG_IMAGE = '/logo.svg';
 
