@@ -4,10 +4,12 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BlogArticleView from "@/components/blog/BlogArticleView";
 import { getCategories, resolvePostCategories } from "@/lib/blog/categories";
-import { getPostBySlug } from "@/lib/blog/storage";
+import { getPostBySlug, getPublishedPosts } from "@/lib/blog/storage";
 import { renderMarkdown } from "@/lib/blog/markdown";
+import { prepareArticleHtml } from "@/lib/blog/toc";
 import { BLOG_CONFIG } from "@/lib/blog/config";
 import { getPostPath, isReservedSlug } from "@/lib/blog/paths";
+import { getPopularCalculatorLinks } from "@/lib/internalLinks";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -50,8 +52,15 @@ export default async function ArticlePage({ params }: PageProps) {
   const post = await getPostBySlug(slug);
   if (!post || post.status !== "published") notFound();
 
-  const html = renderMarkdown(post.content);
-  const categories = resolvePostCategories(post.categories, await getCategories());
+  const [allPosts, categories] = await Promise.all([
+    getPublishedPosts(),
+    getCategories(),
+  ]);
+  const rendered = renderMarkdown(post.content);
+  const { html, toc } = prepareArticleHtml(rendered);
+  const resolvedCategories = resolvePostCategories(post.categories, categories);
+  const recentPosts = allPosts.filter((item) => item.slug !== slug).slice(0, 5);
+  const calculators = getPopularCalculatorLinks(6);
 
   return (
     <>
@@ -68,7 +77,10 @@ export default async function ArticlePage({ params }: PageProps) {
         html={html}
         content={post.content}
         publishedAt={post.publishedAt}
-        categories={categories}
+        categories={resolvedCategories}
+        toc={toc}
+        recentPosts={recentPosts}
+        calculators={calculators}
       />
       <Footer />
     </>

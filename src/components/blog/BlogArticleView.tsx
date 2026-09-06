@@ -1,10 +1,17 @@
 import Link from "next/link";
 import Breadcrumbs from "@/components/Breadcrumbs";
-import { estimateReadingTime } from "@/lib/blog/markdown";
-import { analyzeSeo } from "@/lib/blog/seo-score";
+import BlogArticleSidebar from "@/components/blog/BlogArticleSidebar";
+import BlogStickyColumn from "@/components/blog/BlogStickyColumn";
+import BlogTableOfContents from "@/components/blog/BlogTableOfContents";
 import { getPostPath } from "@/lib/blog/paths";
-import { BLOG_CONFIG } from "@/lib/blog/config";
+import type { TocItem } from "@/lib/blog/toc";
+import type { BlogPost } from "@/lib/blog/types";
 import "@/styles/blog-public.css";
+
+interface SidebarLink {
+  href: string;
+  label: string;
+}
 
 interface BlogArticleViewProps {
   title: string;
@@ -19,78 +26,44 @@ interface BlogArticleViewProps {
   content: string;
   publishedAt: string;
   categories?: Array<{ slug: string; name: string }>;
-}
-
-function authorInitials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "CP";
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
+  toc?: TocItem[];
+  recentPosts?: BlogPost[];
+  calculators?: SidebarLink[];
 }
 
 export default function BlogArticleView({
   title,
   slug,
   excerpt = "",
-  author,
   featuredImage = "",
   featuredImageAlt = "",
-  featuredImageTitle = "",
   featuredImageDescription = "",
   html,
-  content,
-  publishedAt,
   categories = [],
+  toc = [],
+  recentPosts = [],
+  calculators = [],
 }: BlogArticleViewProps) {
-  const seo = analyzeSeo(title, slug, excerpt, "", content, {
-    excerpt,
-    featuredImage,
-    featuredImageAlt,
-  });
-  const readingMin = estimateReadingTime(seo.wordCount);
   const displayTitle = title.trim() || "Untitled article";
-  const displayAuthor = author.trim() || BLOG_CONFIG.defaultAuthor;
-  const formattedDate = new Date(publishedAt).toLocaleDateString("en-US", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  const imageCaption = featuredImageDescription.trim();
 
   return (
     <main id="main-content" className="blog-article">
-      <div className="blog-article__topbar">
-        <div className="container blog-article__topbar-inner">
-          <Breadcrumbs
-            items={[
-              { href: "/", label: "Home" },
-              { href: "/blog", label: "Blog" },
-              { label: displayTitle },
-            ]}
-          />
-          <Link href="/blog" className="blog-article__back">
-            ← All articles
-          </Link>
-        </div>
-      </div>
-
-      <header className={`blog-article__hero${featuredImage ? " blog-article__hero--image" : ""}`}>
-        {featuredImage && (
-          <div className="blog-article__hero-media">
-            <img
-              src={featuredImage}
-              alt={featuredImageAlt || displayTitle}
-              title={featuredImageTitle || undefined}
+      <header className="blog-article__banner">
+        <div className="blog-article__shell">
+          <div className="blog-article__topbar-inner">
+            <Breadcrumbs
+              items={[
+                { href: "/", label: "Home" },
+                { href: "/blog", label: "Blog" },
+                { label: displayTitle },
+              ]}
             />
-            <span className="blog-article__hero-overlay" />
+            <Link href="/blog" className="blog-article__back">
+              ← All articles
+            </Link>
           </div>
-        )}
 
-        <div className="container blog-article__hero-content">
-          <span className="blog-article__kicker">
-            {categories[0]?.name || "CGPA & GPA Guide"}
-          </span>
           {categories.length > 0 && (
             <div className="blog-article__cats">
               {categories.map((category) => (
@@ -104,79 +77,54 @@ export default function BlogArticleView({
               ))}
             </div>
           )}
+
           <h1 className="blog-article__title">{displayTitle}</h1>
-          {featuredImageDescription.trim() && (
-            <p className="blog-article__image-desc">{featuredImageDescription}</p>
-          )}
 
           {excerpt.trim() && <p className="blog-article__excerpt">{excerpt}</p>}
-
-          <div className="blog-article__meta-bar">
-            <div className="blog-article__author">
-              <span className="blog-article__avatar" aria-hidden="true">
-                {authorInitials(displayAuthor)}
-              </span>
-              <div>
-                <strong>{displayAuthor}</strong>
-                <time dateTime={publishedAt}>{formattedDate}</time>
-              </div>
-            </div>
-
-            <div className="blog-article__stats">
-              <span className="blog-article__stat">
-                <strong>{readingMin}</strong> min read
-              </span>
-              <span className="blog-article__stat">
-                <strong>{seo.wordCount.toLocaleString()}</strong> words
-              </span>
-            </div>
-          </div>
         </div>
       </header>
 
-      <div className="container blog-article__body">
-        <article className="blog-article__card">
+      <div className="blog-article__shell blog-article__layout">
+        <BlogStickyColumn className="blog-article__sidebar-left" aria-label="Table of contents">
+          <BlogTableOfContents items={toc} />
+        </BlogStickyColumn>
+
+        <article className="blog-article__main">
+          {featuredImage && (
+            <figure className="blog-article__lead-media">
+              <img
+                src={featuredImage}
+                alt={featuredImageAlt || displayTitle}
+                loading="eager"
+              />
+              {imageCaption && (
+                <figcaption className="blog-article__lead-media-caption">{imageCaption}</figcaption>
+              )}
+            </figure>
+          )}
+
           <div
             className="blog-article__prose"
             dangerouslySetInnerHTML={{
               __html: html || "<p>Start writing to see your article preview.</p>",
             }}
           />
+
+          <footer className="blog-article__footer">
+            <Link href="/blog" className="blog-article__footer-link">
+              ← Back to all articles
+            </Link>
+            {slug ? (
+              <Link href={getPostPath(slug)} className="blog-article__footer-share">
+                Share this guide
+              </Link>
+            ) : null}
+          </footer>
         </article>
 
-        <aside className="blog-article__cta-grid" aria-label="Helpful tools">
-          <Link href="/" className="blog-article__cta-card blog-article__cta-card--primary">
-            <span className="blog-article__cta-label">Free tool</span>
-            <strong>Calculate your CGPA</strong>
-            <span className="blog-article__cta-arrow">Open calculator →</span>
-          </Link>
-          <Link href="/universities" className="blog-article__cta-card">
-            <span className="blog-article__cta-label">60+ scales</span>
-            <strong>University grading guides</strong>
-            <span className="blog-article__cta-arrow">Browse universities →</span>
-          </Link>
-          <Link href="/universities/bangladesh" className="blog-article__cta-card">
-            <span className="blog-article__cta-label">Regional</span>
-            <strong>Bangladesh university guides</strong>
-            <span className="blog-article__cta-arrow">Browse guides →</span>
-          </Link>
-        </aside>
-
-        <footer className="blog-article__footer">
-          <p>
-            Published on <time dateTime={publishedAt}>{formattedDate}</time>
-            {slug ? (
-              <>
-                {" "}
-                · Permalink:{" "}
-                <Link href={getPostPath(slug)}>{getPostPath(slug)}</Link>
-              </>
-            ) : null}
-          </p>
-          <Link href="/blog" className="blog-article__footer-link">
-            ← Back to all articles
-          </Link>
-        </footer>
+        <BlogStickyColumn className="blog-article__sidebar-right" aria-label="Related links">
+          <BlogArticleSidebar recentPosts={recentPosts} calculators={calculators} />
+        </BlogStickyColumn>
       </div>
     </main>
   );
