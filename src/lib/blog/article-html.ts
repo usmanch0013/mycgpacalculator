@@ -107,27 +107,6 @@ function promoteNumberedParagraphToH2(html: string): string {
   return `<h2 class="blog-section-heading"><span class="blog-section-heading__num">${number}</span><span>${title || cleaned}</span></h2>`;
 }
 
-function isStandaloneStrongParagraph(html: string): boolean {
-  const inner = paragraphInner(html);
-  if (!inner) return false;
-
-  const normalized = inner.trim();
-  const match = normalized.match(/^<(strong|b)>([\s\S]*)<\/\1>$/i);
-  if (!match) return false;
-
-  const text = stripTags(match[2]);
-  if (!text || text.length > 100) return false;
-  if (/[.!]$/.test(text) && text.split(" ").length > 8) return false;
-
-  return true;
-}
-
-function promoteStandaloneStrongParagraph(html: string): string {
-  const inner = paragraphInner(html);
-  if (!inner || !isStandaloneStrongParagraph(html)) return html;
-  return `<h2>${inner.trim()}</h2>`;
-}
-
 function paragraphToListItem(html: string): string {
   const inner = paragraphInner(html);
   if (!inner) return "";
@@ -267,7 +246,7 @@ function groupListParagraphs(blocks: string[]): string[] {
     }
 
     if (!isBulletLine(inner) && !isOrderedLine(inner)) {
-      output.push(promoteStandaloneStrongParagraph(convertBrListParagraph(block)));
+      output.push(convertBrListParagraph(block));
       index += 1;
       continue;
     }
