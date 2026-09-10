@@ -1,3 +1,5 @@
+import { repairArticleLinkHrefs } from "./link-href";
+
 const BULLET_PREFIX =
   /^(?:&nbsp;|\u00a0|\s)*[\u2022\u2023\u25E6\u2043\u2219•●○◦\-–—]\s+/;
 const ORDERED_PREFIX = /^(?:&nbsp;|\u00a0|\s)*(\d+)[.)]\s+/;
@@ -169,6 +171,36 @@ function wrapBareTables(html: string): string {
   );
 }
 
+function protectEditorBlocks(html: string): { html: string; blocks: string[] } {
+  const blocks: string[] = [];
+  let protectedHtml = html;
+
+  const protect = (pattern: RegExp) => {
+    protectedHtml = protectedHtml.replace(pattern, (match) => {
+      const token = `<!--EDITOR_BLOCK_${blocks.length}-->`;
+      blocks.push(match);
+      return token;
+    });
+  };
+
+  protect(
+    /<div class="blog-faq">\s*(?:<details class="blog-faq__item">[\s\S]*?<\/details>\s*)*<\/div>/gi
+  );
+  protect(/<div class="blog-table-wrap">[\s\S]*?<\/div>/gi);
+  protect(/<figure class="blog-image[^"]*">[\s\S]*?<\/figure>/gi);
+  protect(/<ul class="blog-list"[^>]*>[\s\S]*?<\/ul>/gi);
+  protect(/<ol class="blog-list[^"]*"[^>]*>[\s\S]*?<\/ol>/gi);
+
+  return { html: protectedHtml, blocks };
+}
+
+function restoreEditorBlocks(html: string, blocks: string[]): string {
+  return blocks.reduce(
+    (result, block, index) => result.replace(`<!--EDITOR_BLOCK_${index}-->`, block),
+    html
+  );
+}
+
 function splitBlocks(html: string): string[] {
   const blocks: string[] = [];
   const pattern =
@@ -289,7 +321,47 @@ export function prepareMarkdownSource(content: string): string {
     .join("\n");
 }
 
-export function normalizeArticleHtml(html: string): string {
+function cleanStyleAttribute(style: string): string {
+  return style
+    .split(";")
+    .map((part) => part.trim())
+    .filter((part) => {
+      if (!part) return false;
+      const key = part.split(":")[0]?.trim().toLowerCase();
+      if (!key) return false;
+      if (key === "color") return false;
+      if (key === "background" || key === "background-color") return false;
+      return true;
+    })
+    .join("; ");
+}
+
+/** Remove pasted Word/Docs inline colors — use HL (highlight) for emphasis instead. */
+export function stripInlineColors(html: string): string {
+  return html
+    .replace(/style="([^"]*)"/gi, (_match, style: string) => {
+      const cleaned = cleanStyleAttribute(style);
+      return cleaned ? `style="${cleaned}"` : "";
+    })
+    .replace(/style='([^']*)'/gi, (_match, style: string) => {
+      const cleaned = cleanStyleAttribute(style);
+      return cleaned ? `style='${cleaned}'` : "";
+    })
+    .replace(/\s*style=["']\s*["']/gi, "")
+    .replace(/<font\b[^>]*>/gi, "")
+    .replace(/<\/font>/gi, "");
+}
+
+function lightNormalizeEditorBlocks(blocks: string[]): string[] {
+  return blocks.map((block) => {
+    const inner = paragraphInner(block);
+    if (!inner) return block;
+    return convertBrListParagraph(block);
+  });
+}
+
+/** Aggressive list grouping for pasted Word/Docs HTML — not used on live editor saves. */
+export function normalizePastedArticleHtml(html: string): string {
   if (!html.trim()) return html;
 
   const normalized = html
@@ -297,6 +369,39 @@ export function normalizeArticleHtml(html: string): string {
     .replace(/<br class="Apple-interchange-newline">/gi, "<br>")
     .trim();
 
-  const blocks = groupListParagraphs(splitBlocks(normalized));
-  return wrapBareTables(blocks.join("\n"));
+  const { html: protectedHtml, blocks } = protectEditorBlocks(normalized);
+  const processed = groupListParagraphs(splitBlocks(protectedHtml));
+  const restored = restoreEditorBlocks(processed.join("\n"), blocks);
+  return wrapBareTables(restored);
+}
+
+/** Ensure inline article links get a consistent class for editor + public styling. */
+export function stampArticleLinks(html: string): string {
+  return html.replace(/<a(\s[^>]*)?>/gi, (match) => {
+    if (/blog-image__link|blog-toc__link/.test(match)) return match;
+    if (/blog-link/.test(match)) return match;
+    if (/class="/i.test(match)) {
+      return match.replace(/class="/i, 'class="blog-link ');
+    }
+    if (/class='/i.test(match)) {
+      return match.replace(/class='/i, "class='blog-link ");
+    }
+    return match.replace("<a", '<a class="blog-link"');
+  });
+}
+
+export function normalizeArticleHtml(html: string): string {
+  if (!html.trim()) return html;
+
+  const normalized = stripInlineColors(
+    html
+      .replace(/\u00a0/g, " ")
+      .replace(/<br class="Apple-interchange-newline">/gi, "<br>")
+      .trim()
+  );
+
+  const { html: protectedHtml, blocks } = protectEditorBlocks(normalized);
+  const processed = lightNormalizeEditorBlocks(splitBlocks(protectedHtml));
+  const restored = restoreEditorBlocks(processed.join("\n"), blocks);
+  return stampArticleLinks(repairArticleLinkHrefs(wrapBareTables(restored)));
 }

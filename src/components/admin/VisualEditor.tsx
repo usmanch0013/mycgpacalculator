@@ -13,7 +13,11 @@ import {
   detectBlockFormat,
   handleVisualEnterKey,
   insertLink,
+  applyBlockAlignment,
+  getActiveListStyle,
   insertHtmlAtSelection,
+  saveEditorSelection,
+  setListStyle,
   sourceToVisualHtml,
   toggleHighlight,
   toggleList,
@@ -21,6 +25,7 @@ import {
   visualHtmlToStoredSource,
   wrapRangeWithBlockquote,
   type BlockFormat,
+  type ListStyle,
 } from "@/lib/blog/visual-html";
 
 export type VisualEditorHandle = {
@@ -28,8 +33,11 @@ export type VisualEditorHandle = {
   focus: () => void;
   exec: (command: VisualCommand) => void;
   insertHtml: (html: string) => void;
+  saveSelection: () => void;
   applyFormat: (format: BlockFormat) => void;
   getActiveFormat: () => BlockFormat;
+  getActiveListStyle: () => ListStyle | null;
+  setListStyle: (style: ListStyle) => void;
 };
 
 export type VisualCommand =
@@ -39,16 +47,20 @@ export type VisualCommand =
   | "ol"
   | "link"
   | "hr"
-  | "highlight";
+  | "highlight"
+  | "alignLeft"
+  | "alignCenter"
+  | "alignRight";
 
 interface VisualEditorProps {
   source: string;
   onChange: (source: string) => void;
   onFormatChange?: (format: BlockFormat) => void;
+  onListStyleChange?: (style: ListStyle | null) => void;
 }
 
 const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(function VisualEditor(
-  { source, onChange, onFormatChange },
+  { source, onChange, onFormatChange, onListStyleChange },
   ref
 ) {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -88,6 +100,7 @@ const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(function 
     const format = detectBlockFormat(selection?.anchorNode ?? null, el);
     setActiveFormat(format);
     onFormatChange?.(format);
+    onListStyleChange?.(getActiveListStyle(el));
   }
 
   useEffect(() => {
@@ -264,6 +277,15 @@ const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(function 
       case "highlight":
         toggleHighlight();
         break;
+      case "alignLeft":
+        applyBlockAlignment("left", el);
+        break;
+      case "alignCenter":
+        applyBlockAlignment("center", el);
+        break;
+      case "alignRight":
+        applyBlockAlignment("right", el);
+        break;
       default:
         break;
     }
@@ -275,12 +297,15 @@ const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(function 
     getHtml: () => visualHtmlToStoredSource(editorRef.current?.innerHTML || ""),
     focus: () => editorRef.current?.focus(),
     exec: runCommand,
+    saveSelection: () => {
+      saveEditorSelection(editorRef.current || undefined);
+    },
     insertHtml: (html: string) => {
       const el = editorRef.current;
       if (!el) return;
       pushUndo();
+      insertHtmlAtSelection(html, el);
       el.focus();
-      insertHtmlAtSelection(html);
       syncFromEditor();
     },
     applyFormat: (format: BlockFormat) => {
@@ -291,6 +316,18 @@ const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(function 
       syncFromEditor();
     },
     getActiveFormat: () => activeFormat,
+    getActiveListStyle: () => {
+      const el = editorRef.current;
+      if (!el) return null;
+      return getActiveListStyle(el);
+    },
+    setListStyle: (style: ListStyle) => {
+      const el = editorRef.current;
+      if (!el) return;
+      pushUndo();
+      setListStyle(style, el);
+      syncFromEditor();
+    },
   }));
 
   function handlePaste(event: React.ClipboardEvent<HTMLDivElement>) {
@@ -302,7 +339,7 @@ const VisualEditor = forwardRef<VisualEditorHandle, VisualEditorProps>(function 
 
     event.preventDefault();
     pushUndo();
-    insertHtmlAtSelection(converted);
+    insertHtmlAtSelection(converted, editorRef.current);
     syncFromEditor();
   }
 

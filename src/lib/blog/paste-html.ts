@@ -1,3 +1,5 @@
+import { normalizeArticleLinkHref } from "./link-href";
+
 function normalizeText(value: string): string {
   return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -130,10 +132,11 @@ function inlineHtml(node: Node): string {
     case "em":
     case "i":
       return children.trim() ? `<em>${children}</em>` : "";
-    case "a":
-      return children.trim()
-        ? `<a href="${el.getAttribute("href") || "#"}">${children}</a>`
-        : "";
+    case "a": {
+      const rawHref = el.getAttribute("href") || "#";
+      const href = rawHref.startsWith("#") ? rawHref : normalizeArticleLinkHref(rawHref);
+      return children.trim() ? `<a class="blog-link" href="${href}">${children}</a>` : "";
+    }
     case "span":
     case "font":
       return children;

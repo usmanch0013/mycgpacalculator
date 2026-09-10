@@ -5,7 +5,7 @@ import BlockInserterModal from "@/components/admin/BlockInserterModal";
 import ImageInsertModal from "@/components/admin/ImageInsertModal";
 import VisualEditor, { type VisualCommand, type VisualEditorHandle } from "@/components/admin/VisualEditor";
 import { convertPastedHtmlToContent, getClipboardHtml } from "@/lib/blog/paste-html";
-import { BLOCK_FORMAT_LABELS, type BlockFormat } from "@/lib/blog/visual-html";
+import { BLOCK_FORMAT_LABELS, type BlockFormat, type ListStyle } from "@/lib/blog/visual-html";
 
 interface ContentEditorProps {
   value: string;
@@ -27,7 +27,10 @@ type ToolId =
   | "faq"
   | "html"
   | "blocks"
-  | "code";
+  | "code"
+  | "alignLeft"
+  | "alignCenter"
+  | "alignRight";
 
 const FORMAT_OPTIONS: BlockFormat[] = [
   "paragraph",
@@ -104,6 +107,9 @@ const ICON = {
       <path d="M9.4 16.6 4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0 4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z" />
     </svg>
   ),
+  alignLeft: <span className="ce-icon-text">L</span>,
+  alignCenter: <span className="ce-icon-text">C</span>,
+  alignRight: <span className="ce-icon-text">R</span>,
 };
 
 const TOOL_GROUPS: { label: string; tools: ToolDef[] }[] = [
@@ -124,6 +130,9 @@ const TOOL_GROUPS: { label: string; tools: ToolDef[] }[] = [
       { id: "italic", title: "Italic", icon: ICON.italic },
       { id: "link", title: "Insert link", icon: ICON.link },
       { id: "highlight", title: "Highlight text", icon: ICON.highlight },
+      { id: "alignLeft", title: "Align left", icon: ICON.alignLeft },
+      { id: "alignCenter", title: "Align center", icon: ICON.alignCenter },
+      { id: "alignRight", title: "Align right", icon: ICON.alignRight },
     ],
   },
   {
@@ -145,6 +154,9 @@ const VISUAL_COMMANDS = new Set<ToolId>([
   "ol",
   "link",
   "hr",
+  "alignLeft",
+  "alignCenter",
+  "alignRight",
 ]);
 
 function wrapSelection(
@@ -219,6 +231,7 @@ export default forwardRef<ContentEditorHandle, ContentEditorProps>(function Cont
   const [blockModalTab, setBlockModalTab] = useState<"table" | "faq" | "image" | "html" | null>(null);
   const [editorMode, setEditorMode] = useState<EditorMode>("visual");
   const [blockFormat, setBlockFormat] = useState<BlockFormat>("paragraph");
+  const [listStyle, setListStyle] = useState<ListStyle | null>(null);
   const [pendingImageUrl, setPendingImageUrl] = useState("");
 
   useImperativeHandle(ref, () => ({
@@ -435,7 +448,12 @@ export default forwardRef<ContentEditorHandle, ContentEditorProps>(function Cont
   }
 
   function handleQuickInsert(html: string) {
-    insertAtCursor(`\n\n${html.trim()}\n\n`);
+    const trimmed = html.trim();
+    if (editorMode === "visual") {
+      visualRef.current?.insertHtml(trimmed);
+      return;
+    }
+    insertAtCursor(`\n\n${trimmed}\n\n`);
   }
 
   function handleTextPaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
@@ -466,6 +484,7 @@ export default forwardRef<ContentEditorHandle, ContentEditorProps>(function Cont
 
   return (
     <div className={`content-editor ${isCanvas ? "content-editor--canvas" : ""}`}>
+      <div className="content-editor__chrome">
       <div className="content-editor__mode-bar">
         <div className="content-editor__mode-tabs" role="tablist" aria-label="Editor mode">
           <button
@@ -513,6 +532,29 @@ export default forwardRef<ContentEditorHandle, ContentEditorProps>(function Cont
             ))}
           </select>
         </div>
+        <div className="content-editor__group content-editor__group--format">
+          <label className="content-editor__format-label" htmlFor="editor-list-style-select">
+            List
+          </label>
+          <select
+            id="editor-list-style-select"
+            className="content-editor__format-select"
+            value={listStyle ?? ""}
+            disabled={editorMode !== "visual" || !listStyle}
+            onChange={(e) => {
+              const next = e.target.value as ListStyle;
+              visualRef.current?.setListStyle(next);
+              setListStyle(next);
+            }}
+            title="Change style for the current list only"
+          >
+            <option value="" disabled>
+              {listStyle ? "List style" : "Click inside a list"}
+            </option>
+            <option value="card">Card boxes</option>
+            <option value="simple">Simple bullets</option>
+          </select>
+        </div>
         <span className="content-editor__divider" aria-hidden />
         {TOOL_GROUPS.map((group, gi) => (
           <div key={group.label} className="content-editor__group">
@@ -526,7 +568,17 @@ export default forwardRef<ContentEditorHandle, ContentEditorProps>(function Cont
                 }`}
                 title={tool.title}
                 aria-label={tool.title}
-                onMouseDown={(event) => event.preventDefault()}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  if (
+                    editorMode === "visual" &&
+                    ["link", "bold", "italic", "highlight", "image", "blocks", "table", "faq", "html"].includes(
+                      tool.id
+                    )
+                  ) {
+                    visualRef.current?.saveSelection();
+                  }
+                }}
                 onClick={() => handleTool(tool.id)}
                 disabled={uploading && tool.id === "image"}
               >
@@ -536,6 +588,7 @@ export default forwardRef<ContentEditorHandle, ContentEditorProps>(function Cont
           </div>
         ))}
       </div>
+      </div>
 
       <div className="content-editor__workspace">
         {editorMode === "visual" ? (
@@ -544,6 +597,7 @@ export default forwardRef<ContentEditorHandle, ContentEditorProps>(function Cont
             source={value}
             onChange={onChange}
             onFormatChange={setBlockFormat}
+            onListStyleChange={setListStyle}
           />
         ) : (
           <textarea

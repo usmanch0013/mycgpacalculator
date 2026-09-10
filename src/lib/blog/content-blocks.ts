@@ -1,3 +1,5 @@
+import { isExternalArticleLink, normalizeArticleLinkHref } from "@/lib/blog/link-href";
+
 export function buildTableHtml(rows: number, cols: number, withHeader = true): string {
   const safeRows = Math.min(Math.max(rows, 2), 12);
   const safeCols = Math.min(Math.max(cols, 2), 8);
@@ -41,19 +43,26 @@ export function buildImageHtml(
   url: string,
   alt: string,
   align: "default" | "wide" | "center" = "default",
-  extras?: { title?: string; description?: string }
+  extras?: { title?: string; description?: string; link?: string }
 ): string {
   const cleanUrl = url.trim();
   const cleanAlt = alt.trim() || "Image";
   const cleanTitle = extras?.title?.trim() || "";
-  const caption = extras?.description?.trim() || cleanAlt;
+  const caption = extras?.description?.trim() || "";
+  const linkHref = extras?.link ? normalizeArticleLinkHref(extras.link) : "";
   const alignClass =
     align === "wide" ? " blog-image--wide" : align === "center" ? " blog-image--center" : "";
   const titleAttr = cleanTitle ? ` title="${escapeHtml(cleanTitle)}"` : "";
+  const captionHtml = caption ? `\n<figcaption>${escapeHtml(caption)}</figcaption>` : "";
+  const imgTag = `<img src="${cleanUrl}" alt="${escapeHtml(cleanAlt)}"${titleAttr} loading="lazy" />`;
+  const linkedImg = linkHref
+    ? `<a href="${escapeHtml(linkHref)}" class="blog-image__link"${
+        isExternalArticleLink(linkHref) ? ' target="_blank" rel="noopener noreferrer"' : ""
+      }>${imgTag}</a>`
+    : imgTag;
 
   return `<figure class="blog-image${alignClass}">
-<img src="${cleanUrl}" alt="${escapeHtml(cleanAlt)}"${titleAttr} loading="lazy" />
-<figcaption>${escapeHtml(caption)}</figcaption>
+${linkedImg}${captionHtml}
 </figure>`;
 }
 

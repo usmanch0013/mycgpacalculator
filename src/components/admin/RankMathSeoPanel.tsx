@@ -77,7 +77,10 @@ function SeoSection({
           {checks.map((check) => (
             <li key={check.id} className="rm-item">
               <CheckIcon status={check.status} />
-              <span className="rm-item__text">{check.message}</span>
+              <span className="rm-item__body">
+                <span className="rm-item__label">{check.label}</span>
+                <span className="rm-item__text">{check.message}</span>
+              </span>
             </li>
           ))}
         </ul>

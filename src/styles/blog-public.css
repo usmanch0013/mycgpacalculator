@@ -859,6 +859,26 @@ a.blog-cat:hover {
   padding-left: 2rem;
 }
 
+.blog-article__prose .blog-list--simple {
+  list-style: disc outside;
+  padding-left: 1.5rem;
+}
+
+.blog-article__prose .blog-list--simple.blog-list--ordered {
+  list-style: decimal outside;
+}
+
+.blog-article__prose .blog-list--simple > li {
+  padding: 0.15rem 0 0.15rem 0.35rem;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+.blog-article__prose .blog-list--simple > li::before {
+  display: none;
+}
+
 .blog-article__prose .blog-list--ordered > li::before {
   content: counter(blog-step);
   counter-increment: blog-step;
@@ -1041,6 +1061,26 @@ a.blog-cat:hover {
   box-shadow: none;
 }
 
+.visual-editor .blog-list--simple {
+  list-style: disc outside;
+  padding-left: 1.6rem;
+}
+
+.visual-editor .blog-list--simple.blog-list--ordered {
+  list-style: decimal outside;
+}
+
+.visual-editor .blog-list--simple > li {
+  padding: 0.2rem 0 0.2rem 0.35rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.visual-editor .blog-list--simple > li::before {
+  display: none;
+}
+
 .visual-editor ul:not(.blog-list) {
   list-style: disc outside;
   padding-left: 1.6rem;
@@ -1051,17 +1091,20 @@ a.blog-cat:hover {
   padding-left: 1.6rem;
 }
 
-.blog-article__prose a {
-  color: var(--forest-700);
+.blog-article__prose a.blog-link,
+.blog-article__prose a:not([class]) {
+  color: #1d4ed8;
   font-weight: 600;
   text-decoration: underline;
-  text-decoration-color: rgba(37, 99, 235, 0.35);
-  text-underline-offset: 0.18em;
+  text-decoration-color: rgba(37, 99, 235, 0.42);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1.5px;
   transition: color 0.15s ease, text-decoration-color 0.15s ease;
 }
 
-.blog-article__prose a:hover {
-  color: var(--amber-600);
+.blog-article__prose a.blog-link:hover,
+.blog-article__prose a:not([class]):hover {
+  color: #1e40af;
   text-decoration-color: currentColor;
 }
 
@@ -1173,10 +1216,12 @@ a.blog-cat:hover {
   font-weight: 500;
 }
 
-.blog-article__prose blockquote.callout a {
-  color: var(--forest-700);
+.blog-article__prose blockquote.callout a.blog-link,
+.blog-article__prose blockquote.callout a:not([class]) {
+  color: #1d4ed8;
   font-weight: 700;
   text-decoration: underline;
+  text-decoration-color: rgba(37, 99, 235, 0.45);
 }
 
 .blog-article__footer {
@@ -1369,6 +1414,16 @@ a.blog-cat:hover {
   margin: 1.5rem 0;
 }
 
+.blog-image__link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.blog-image__link:hover img {
+  opacity: 0.92;
+}
+
 .blog-image img {
   width: 100%;
   height: auto;
@@ -1382,6 +1437,10 @@ a.blog-cat:hover {
   font-size: 0.82rem;
   color: var(--stone-500);
   text-align: center;
+}
+
+.blog-image figcaption:empty {
+  display: none;
 }
 
 .blog-image--center {

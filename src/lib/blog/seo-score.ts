@@ -1,4 +1,5 @@
 import { BLOG_CONFIG } from "./config";
+import { fixMalformedLinkHref } from "./link-href";
 import type { SeoCheck, SeoCheckCategory, SeoCheckStatus, SeoScoreResult } from "./types";
 
 function countWords(text: string): number {
@@ -227,9 +228,21 @@ function collectHrefs(content: string): string[] {
 }
 
 function classifyHref(href: string): "internal" | "external" | "ignore" {
-  const raw = href.trim().replace(/&amp;/g, "&");
+  const raw = fixMalformedLinkHref(href.trim().replace(/&amp;/g, "&"));
   if (!raw || raw.startsWith("#") || /^(mailto:|tel:|javascript:)/i.test(raw)) {
     return "ignore";
+  }
+
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const parsed = new URL(raw);
+      const siteHost = new URL(BLOG_CONFIG.siteUrl).hostname.replace(/^www\./, "");
+      const host = parsed.hostname.replace(/^www\./, "");
+      if (host === siteHost || host === "localhost") return "internal";
+      return "external";
+    } catch {
+      return "ignore";
+    }
   }
 
   if (raw.startsWith("/")) return "internal";
@@ -470,8 +483,10 @@ export function analyzeSeo(
       "Meta description length",
       metaLen >= 120 && metaLen <= 160,
       metaLen >= 90 && metaLen <= 170,
-      `${metaLen} characters — ideal (120–160).`,
-      `${metaLen} characters — aim for 120–160.`,
+      `Meta description is ${metaLen} characters — ideal length is 120–160.`,
+      metaLen === 0
+        ? "Meta description is empty — add one in the SEO sidebar (120–160 characters)."
+        : `Meta description is ${metaLen} characters — aim for 120–160.`,
       8,
       "basic"
     )
@@ -610,16 +625,26 @@ export function analyzeSeo(
   const extraCount = Math.max(0, densityKeywords.length - (focusKeyword.trim() ? 1 : 0));
   const densityHint =
     extraCount > 0 ? ` (primary + ${extraCount} secondary)` : "";
+  const densityPct = density.toFixed(2);
+  const densityPassed = density >= 1 && density <= 3;
+  const densityPartial =
+    (density > 0 && density < 1) || (density > 3 && density < 4.5);
+  const densityBadMsg =
+    density === 0
+      ? "Focus keyword not found in content body. Add it, or use secondary keywords to cover related phrases."
+      : density < 1
+        ? `Density ${densityPct}%${densityHint} — below 1%. Add the primary keyword more often, or use secondary keywords.`
+        : density >= 4.5
+          ? `Density ${densityPct}%${densityHint} — too high (over 4.5%). Reduce keyword repetition to avoid stuffing.`
+          : `Density ${densityPct}%${densityHint} — slightly above ideal (1–3%). Use synonyms or related phrases instead of repeating the keyword.`;
   checks.push(
     check(
       "keyword-density",
       "Keyword density",
-      density >= 1 && density <= 2.5,
-      density > 0 && density < 3.5,
-      `Keyword density is ${density.toFixed(2)}%${densityHint} — healthy range (1–2.5%).`,
-      density === 0
-        ? "Focus keyword not found in content body. Add it, or use secondary keywords to cover related phrases."
-        : `Density ${density.toFixed(2)}%${densityHint} — aim for at least 1% (ideal 1–2.5%). Add the primary keyword more often, or use secondary keywords.`,
+      densityPassed,
+      densityPartial,
+      `Keyword density is ${densityPct}%${densityHint} — healthy range (1–3%).`,
+      densityBadMsg,
       6,
       "additional"
     )

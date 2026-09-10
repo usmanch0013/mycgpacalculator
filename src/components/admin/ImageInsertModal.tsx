@@ -19,19 +19,24 @@ export default function ImageInsertModal({
   const [alt, setAlt] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [link, setLink] = useState("");
+  const [align, setAlign] = useState<"default" | "wide" | "center">("default");
 
   if (!open) return null;
 
   function insert() {
     onInsert(
-      buildImageHtml(url, alt, "default", {
+      buildImageHtml(url, alt, align, {
         title,
         description,
+        link,
       })
     );
     setAlt("");
     setTitle("");
     setDescription("");
+    setLink("");
+    setAlign("default");
     onClose();
   }
 
@@ -77,8 +82,29 @@ export default function ImageInsertModal({
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Caption shown under the image"
+              placeholder="Optional caption under the image"
             />
+          </label>
+          <label className="rm-field">
+            <span className="rm-field__label">Link URL</span>
+            <input
+              className="rm-field__input"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+              placeholder="e.g. /calculator or https://example.com"
+            />
+          </label>
+          <label className="rm-field">
+            <span className="rm-field__label">Alignment</span>
+            <select
+              className="rm-field__input"
+              value={align}
+              onChange={(e) => setAlign(e.target.value as typeof align)}
+            >
+              <option value="default">Default (full width)</option>
+              <option value="center">Centered</option>
+              <option value="wide">Wide</option>
+            </select>
           </label>
         </div>
 

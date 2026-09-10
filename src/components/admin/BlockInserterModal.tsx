@@ -51,6 +51,7 @@ export default function BlockInserterModal({
   const [imageAlt, setImageAlt] = useState("");
   const [imageTitle, setImageTitle] = useState("");
   const [imageDescription, setImageDescription] = useState("");
+  const [imageLink, setImageLink] = useState("");
   const [imageAlign, setImageAlign] = useState<"default" | "wide" | "center">("default");
   const [customHtml, setCustomHtml] = useState(HTML_EXAMPLE);
   const [uploading, setUploading] = useState(false);
@@ -248,6 +249,14 @@ export default function BlockInserterModal({
                 />
               </label>
               <label className="block-modal__field">
+                <span>Link URL</span>
+                <input
+                  value={imageLink}
+                  onChange={(e) => setImageLink(e.target.value)}
+                  placeholder="e.g. /calculator or https://example.com"
+                />
+              </label>
+              <label className="block-modal__field">
                 <span>Alignment</span>
                 <select
                   value={imageAlign}
@@ -267,6 +276,7 @@ export default function BlockInserterModal({
                     buildImageHtml(imageUrl, imageAlt, imageAlign, {
                       title: imageTitle,
                       description: imageDescription,
+                      link: imageLink,
                     })
                   )
                 }

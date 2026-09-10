@@ -610,16 +610,26 @@ export function analyzeSeo(
   const extraCount = Math.max(0, densityKeywords.length - (focusKeyword.trim() ? 1 : 0));
   const densityHint =
     extraCount > 0 ? ` (primary + ${extraCount} secondary)` : "";
+  const densityPct = density.toFixed(2);
+  const densityPassed = density >= 1 && density <= 3;
+  const densityPartial =
+    (density > 0 && density < 1) || (density > 3 && density < 4.5);
+  const densityBadMsg =
+    density === 0
+      ? "Focus keyword not found in content body. Add it, or use secondary keywords to cover related phrases."
+      : density < 1
+        ? `Density ${densityPct}%${densityHint} — below 1%. Add the primary keyword more often, or use secondary keywords.`
+        : density >= 4.5
+          ? `Density ${densityPct}%${densityHint} — too high (over 4.5%). Reduce keyword repetition to avoid stuffing.`
+          : `Density ${densityPct}%${densityHint} — slightly above ideal (1–3%). Use synonyms or related phrases instead of repeating the keyword.`;
   checks.push(
     check(
       "keyword-density",
       "Keyword density",
-      density >= 1 && density <= 2.5,
-      density > 0 && density < 3.5,
-      `Keyword density is ${density.toFixed(2)}%${densityHint} — healthy range (1–2.5%).`,
-      density === 0
-        ? "Focus keyword not found in content body. Add it, or use secondary keywords to cover related phrases."
-        : `Density ${density.toFixed(2)}%${densityHint} — aim for at least 1% (ideal 1–2.5%). Add the primary keyword more often, or use secondary keywords.`,
+      densityPassed,
+      densityPartial,
+      `Keyword density is ${densityPct}%${densityHint} — healthy range (1–3%).`,
+      densityBadMsg,
       6,
       "additional"
     )

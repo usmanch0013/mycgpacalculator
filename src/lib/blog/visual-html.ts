@@ -1,5 +1,6 @@
 import { renderMarkdown } from "@/lib/blog/markdown";
-import { normalizeArticleHtml } from "@/lib/blog/article-html";
+import { normalizeArticleHtml, stripInlineColors } from "@/lib/blog/article-html";
+import { isExternalArticleLink, normalizeArticleLinkHref } from "@/lib/blog/link-href";
 
 export function sourceToVisualHtml(source: string): string {
   if (!source.trim()) return "<p><br></p>";
@@ -7,12 +8,14 @@ export function sourceToVisualHtml(source: string): string {
 }
 
 export function visualHtmlToSource(html: string): string {
-  return html
-    .replace(/\u00a0/g, " ")
-    .replace(/<div><br><\/div>/gi, "")
-    .replace(/<p><br><\/p>/gi, "")
-    .replace(/<br class="Apple-interchange-newline">/gi, "")
-    .trim();
+  return stripInlineColors(
+    html
+      .replace(/\u00a0/g, " ")
+      .replace(/<div><br><\/div>/gi, "")
+      .replace(/<p><br><\/p>/gi, "")
+      .replace(/<br class="Apple-interchange-newline">/gi, "")
+      .trim()
+  );
 }
 
 export function visualHtmlToStoredSource(html: string): string {
@@ -238,34 +241,33 @@ export function wrapRangeWithBlockquote(className: string, placeholder = "Quote 
   selection.addRange(newRange);
 }
 
-function normalizeLinkHref(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
+function stampLinkElement(anchor: HTMLAnchorElement) {
+  anchor.classList.add("blog-link");
+}
 
-  if (/^(\/|#|mailto:|tel:)/i.test(trimmed)) return trimmed;
-
-  try {
-    const parsed = new URL(trimmed, window.location.origin);
-    if (parsed.origin === window.location.origin) {
-      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-    }
-    return parsed.href;
-  } catch {
-    return trimmed.startsWith("http") ? trimmed : `/${trimmed.replace(/^\/+/, "")}`;
+function findLinkFromNode(node: Node | null): HTMLAnchorElement | null {
+  if (!node) return null;
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const el = node as HTMLElement;
+    return el.tagName === "A" ? (el as HTMLAnchorElement) : el.closest("a");
   }
+  return node.parentElement?.closest("a") ?? null;
 }
 
 export function insertLink(rawUrl: string) {
+  restoreEditorSelection();
+
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return;
 
-  const href = normalizeLinkHref(rawUrl);
+  const href = normalizeArticleLinkHref(rawUrl);
   if (!href) return;
 
   const range = selection.getRangeAt(0);
   const anchor = document.createElement("a");
   anchor.href = href;
-  if (/^https?:\/\//i.test(href)) {
+  stampLinkElement(anchor);
+  if (isExternalArticleLink(href)) {
     anchor.target = "_blank";
     anchor.rel = "noopener noreferrer";
   }
@@ -280,10 +282,21 @@ export function insertLink(rawUrl: string) {
       range.insertNode(anchor);
     } catch {
       document.execCommand("createLink", false, href);
+      const created = findLinkFromNode(selection.anchorNode);
+      if (created) {
+        created.href = href;
+        stampLinkElement(created);
+        if (isExternalArticleLink(href)) {
+          created.target = "_blank";
+          created.rel = "noopener noreferrer";
+        }
+      }
+      clearSavedEditorSelection();
       return;
     }
   }
 
+  clearSavedEditorSelection();
   selection.removeAllRanges();
   const newRange = document.createRange();
   newRange.selectNodeContents(anchor);
@@ -291,9 +304,242 @@ export function insertLink(rawUrl: string) {
   selection.addRange(newRange);
 }
 
-export function insertHtmlAtSelection(html: string) {
+type EditorCaretBookmark = {
+  blockIndex: number;
+  offset: number;
+  atEnd: boolean;
+};
+
+let pendingSelection: Range | null = null;
+let pendingCaret: EditorCaretBookmark | null = null;
+
+export function saveEditorSelection(editorRoot?: HTMLElement) {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return;
+
+  const range = selection.getRangeAt(0).cloneRange();
+  pendingSelection = range;
+  pendingCaret = null;
+
+  if (!editorRoot) return;
+
+  const block = getBlockElement(range.startContainer, editorRoot);
+  if (!block || block.parentElement !== editorRoot) return;
+
+  const blockIndex = Array.from(editorRoot.children).indexOf(block);
+  if (blockIndex < 0) return;
+
+  const pre = document.createRange();
+  pre.selectNodeContents(block);
+  pre.setEnd(range.startContainer, range.startOffset);
+
+  pendingCaret = {
+    blockIndex,
+    offset: pre.toString().length,
+    atEnd: isRangeAtBlockEnd(range, block),
+  };
+}
+
+export function restoreEditorSelection(): boolean {
+  const selection = window.getSelection();
+  if (!selection || !pendingSelection) return false;
+
+  try {
+    selection.removeAllRanges();
+    selection.addRange(pendingSelection);
+    return true;
+  } catch {
+    pendingSelection = null;
+    pendingCaret = null;
+    return false;
+  }
+}
+
+export function clearSavedEditorSelection() {
+  pendingSelection = null;
+  pendingCaret = null;
+}
+
+function isBlockLevelHtml(html: string): boolean {
+  const trimmed = html.trim();
+  return /^<(figure|div|table|blockquote|h[1-6]|ul|ol|hr)\b/i.test(trimmed);
+}
+
+function isRangeAtBlockEnd(range: Range, block: HTMLElement): boolean {
+  const tail = document.createRange();
+  tail.selectNodeContents(block);
+  tail.setStart(range.endContainer, range.endOffset);
+  const fragment = tail.cloneContents();
+  const text = (fragment.textContent || "").replace(/\u00a0/g, " ").trim();
+  if (text) return false;
+  return !fragment.querySelector("img,video,iframe,figure,table");
+}
+
+function placeCursorAfter(node: Node) {
+  const selection = window.getSelection();
+  if (!selection) return;
+  const newRange = document.createRange();
+  newRange.setStartAfter(node);
+  newRange.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(newRange);
+}
+
+function appendBlockHtml(html: string, editorRoot: HTMLElement) {
+  const template = document.createElement("template");
+  template.innerHTML = html.trim();
+  const elements = Array.from(template.content.children) as HTMLElement[];
+  if (!elements.length) return;
+
+  elements.forEach((el) => editorRoot.appendChild(el));
+  const trailing = document.createElement("p");
+  trailing.innerHTML = "<br>";
+  editorRoot.appendChild(trailing);
+  placeCursorAtStart(trailing);
+}
+
+function splitBlockAtTextOffset(block: HTMLElement, offset: number): HTMLElement | null {
+  if (offset <= 0) return block;
+
+  const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+  let remaining = offset;
+  let textNode: Text | null = null;
+  let splitAt = 0;
+
+  while ((textNode = walker.nextNode() as Text | null)) {
+    const len = textNode.length;
+    if (remaining <= len) {
+      splitAt = remaining;
+      break;
+    }
+    remaining -= len;
+  }
+
+  if (!textNode) return null;
+
+  const range = document.createRange();
+  range.setStart(textNode, splitAt);
+  range.setEnd(block, block.childNodes.length);
+
+  const tag = block.tagName === "PRE" ? "pre" : "p";
+  const after = document.createElement(tag);
+  after.appendChild(range.extractContents());
+  if (!after.innerHTML.trim()) after.innerHTML = "<br>";
+
+  if (!block.innerHTML.trim()) block.innerHTML = "<br>";
+  block.parentNode?.insertBefore(after, block.nextSibling);
+  return after;
+}
+
+function insertBlockAtBookmark(html: string, editorRoot: HTMLElement) {
+  const template = document.createElement("template");
+  template.innerHTML = html.trim();
+  const elements = Array.from(template.content.children) as HTMLElement[];
+  if (!elements.length) return;
+
+  if (!pendingCaret) {
+    appendBlockHtml(html, editorRoot);
+    return;
+  }
+
+  const blocks = Array.from(editorRoot.children) as HTMLElement[];
+  const block = blocks[pendingCaret.blockIndex];
+  if (!block) {
+    appendBlockHtml(html, editorRoot);
+    return;
+  }
+
+  let insertBefore: Node | null = null;
+
+  if (pendingCaret.atEnd) {
+    insertBefore = block.nextSibling;
+  } else if (pendingCaret.offset === 0) {
+    insertBefore = block;
+  } else {
+    const afterPart = splitBlockAtTextOffset(block, pendingCaret.offset);
+    insertBefore = afterPart;
+  }
+
+  elements.forEach((el) => {
+    editorRoot.insertBefore(el, insertBefore);
+  });
+
+  const trailing = document.createElement("p");
+  trailing.innerHTML = "<br>";
+  const lastInserted = elements[elements.length - 1];
+  editorRoot.insertBefore(trailing, lastInserted.nextSibling);
+  placeCursorAtStart(trailing);
+}
+
+function insertBlockHtmlAtCaret(html: string, editorRoot: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection) return;
+
+  const template = document.createElement("template");
+  template.innerHTML = html.trim();
+  const elements = Array.from(template.content.children) as HTMLElement[];
+  if (!elements.length) return;
+
+  if (!selection.rangeCount) {
+    appendBlockHtml(html, editorRoot);
+    return;
+  }
+
+  const range = selection.getRangeAt(0);
+  let block = getBlockElement(range.startContainer, editorRoot);
+
+  if (!block || block.parentElement !== editorRoot) {
+    appendBlockHtml(html, editorRoot);
+    return;
+  }
+
+  let insertAfter: HTMLElement = block;
+
+  if (!isRangeAtBlockEnd(range, block)) {
+    const afterPart = splitBlockAtCaret(block, block.tagName === "PRE" ? "pre" : "p");
+    insertAfter = (afterPart?.previousElementSibling as HTMLElement) || block;
+  }
+
+  let lastInserted: HTMLElement | null = null;
+  elements.forEach((el) => {
+    insertAfter.parentNode?.insertBefore(el, insertAfter.nextSibling);
+    lastInserted = el;
+  });
+
+  const trailing = document.createElement("p");
+  trailing.innerHTML = "<br>";
+  lastInserted?.parentNode?.insertBefore(trailing, lastInserted.nextSibling);
+  placeCursorAtStart(trailing);
+}
+
+export function insertHtmlAtSelection(html: string, editorRoot?: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection) return;
+
+  if (editorRoot && isBlockLevelHtml(html)) {
+    if (!pendingCaret && selection.rangeCount === 0) {
+      restoreEditorSelection();
+    }
+
+    if (pendingCaret) {
+      insertBlockAtBookmark(html, editorRoot);
+    } else {
+      editorRoot.focus();
+      insertBlockHtmlAtCaret(html, editorRoot);
+    }
+    clearSavedEditorSelection();
+    return;
+  }
+
+  if (selection.rangeCount === 0) {
+    restoreEditorSelection();
+  }
+
+  if (!selection.rangeCount) {
+    if (editorRoot) appendBlockHtml(html, editorRoot);
+    clearSavedEditorSelection();
+    return;
+  }
 
   const range = selection.getRangeAt(0);
   range.deleteContents();
@@ -305,12 +551,30 @@ export function insertHtmlAtSelection(html: string) {
   range.insertNode(node);
 
   if (lastNode) {
-    selection.removeAllRanges();
-    const newRange = document.createRange();
-    newRange.setStartAfter(lastNode);
-    newRange.collapse(true);
-    selection.addRange(newRange);
+    placeCursorAfter(lastNode);
   }
+
+  clearSavedEditorSelection();
+}
+
+export function applyBlockAlignment(
+  align: "left" | "center" | "right",
+  editorRoot: HTMLElement
+) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+
+  const block = getBlockElement(selection.anchorNode, editorRoot);
+  if (!block) return;
+
+  if (block.classList.contains("blog-image")) {
+    block.classList.remove("blog-image--center");
+    if (align === "center") block.classList.add("blog-image--center");
+    block.style.textAlign = "";
+    return;
+  }
+
+  block.style.textAlign = align === "left" ? "" : align;
 }
 
 function findParentList(node: Node | null, root: HTMLElement): HTMLElement | null {
@@ -331,9 +595,18 @@ function createListElement(ordered: boolean): HTMLElement {
   return list;
 }
 
+function stripLeadingListMarker(html: string): string {
+  return html
+    .replace(/^(?:&nbsp;|\u00a0|\s)*[\u2022\u2023\u25E6\u2043\u2219•●○◦\-–—]\s+/i, "")
+    .replace(/^(?:&nbsp;|\u00a0|\s)*\d+[.)]\s+/, "")
+    .replace(/^(?:&nbsp;|\u00a0|\s)*-\s+/, "")
+    .trim();
+}
+
 function blockToListItem(block: HTMLElement): HTMLElement {
   const item = document.createElement("li");
-  item.innerHTML = block.innerHTML.trim() || "<br>";
+  const inner = block.innerHTML.trim() || "<br>";
+  item.innerHTML = stripLeadingListMarker(inner) || "<br>";
   return item;
 }
 
@@ -472,6 +745,80 @@ function extractCaretLineAsBlock(block: HTMLElement, selection: Selection): HTML
   return current;
 }
 
+function lineIntersectsRange(nodes: Node[], range: Range): boolean {
+  return nodes.some((node) => range.intersectsNode(node));
+}
+
+function rangeIntersectsBlock(range: Range, block: HTMLElement): boolean {
+  try {
+    const blockRange = document.createRange();
+    blockRange.selectNodeContents(block);
+    return (
+      range.compareBoundaryPoints(Range.END_TO_START, blockRange) <= 0 &&
+      range.compareBoundaryPoints(Range.START_TO_END, blockRange) >= 0
+    );
+  } catch {
+    return range.intersectsNode(block);
+  }
+}
+
+function splitBlockIntoLineParagraphs(block: HTMLElement): HTMLElement[] {
+  const lines = splitBlockChildLines(block);
+  if (lines.length <= 1) return [block];
+
+  const parent = block.parentNode;
+  if (!parent) return [block];
+
+  const paragraphs = lines.map((nodes) => createParagraphFromNodes(nodes));
+  paragraphs.forEach((paragraph) => parent.insertBefore(paragraph, block));
+  block.remove();
+  return paragraphs;
+}
+
+function expandBlocksForListConversion(blocks: HTMLElement[], range: Range): HTMLElement[] {
+  const expanded: HTMLElement[] = [];
+
+  blocks.forEach((block) => {
+    if (block.tagName === "LI") {
+      expanded.push(block);
+      return;
+    }
+
+    if (!rangeIntersectsBlock(range, block)) {
+      return;
+    }
+
+    const lines = splitBlockChildLines(block);
+    if (lines.length <= 1) {
+      expanded.push(block);
+      return;
+    }
+
+    const selectedIndexes = lines
+      .map((nodes, index) => (lineIntersectsRange(nodes, range) ? index : -1))
+      .filter((index) => index >= 0);
+
+    if (selectedIndexes.length <= 1) {
+      if (selectedIndexes.length === 1) {
+        const paragraphs = splitBlockIntoLineParagraphs(block);
+        const paragraph = paragraphs[selectedIndexes[0]];
+        if (paragraph) expanded.push(paragraph);
+        return;
+      }
+      expanded.push(block);
+      return;
+    }
+
+    const paragraphs = splitBlockIntoLineParagraphs(block);
+    selectedIndexes.forEach((index) => {
+      const paragraph = paragraphs[index];
+      if (paragraph) expanded.push(paragraph);
+    });
+  });
+
+  return expanded.length ? expanded : blocks;
+}
+
 function gatherBlocksForListConversion(selection: Selection, root: HTMLElement): HTMLElement[] {
   if (!selection.rangeCount) return [];
 
@@ -484,17 +831,24 @@ function gatherBlocksForListConversion(selection: Selection, root: HTMLElement):
     return [extractCaretLineAsBlock(caretBlock, selection)];
   }
 
-  const selected = getTopLevelBlocksInSelection(selection, root).flatMap((block) => {
-    if (block.tagName === "DIV" && block.parentElement === root) {
-      const inner = getBlockElement(selection.anchorNode, block) || caretBlock;
-      return inner && inner !== block ? [inner] : [];
-    }
-    return [block];
-  }).filter((block) => block.tagName !== "UL" && block.tagName !== "OL");
+  let selected = getTopLevelBlocksInSelection(selection, root)
+    .flatMap((block) => {
+      if (block.tagName === "DIV" && block.parentElement === root) {
+        const inner = getBlockElement(selection.anchorNode, block) || caretBlock;
+        return inner && inner !== block ? [inner] : [block];
+      }
+      return [block];
+    })
+    .filter((block) => block.tagName !== "UL" && block.tagName !== "OL");
 
-  if (selected.length) return selected;
-  if (!caretBlock || caretBlock.tagName === "UL" || caretBlock.tagName === "OL") return [];
-  return [caretBlock];
+  if (!selected.length) {
+    if (!caretBlock || caretBlock.tagName === "UL" || caretBlock.tagName === "OL") return [];
+    selected = [caretBlock];
+  }
+
+  selected = selected.filter((block) => rangeIntersectsBlock(range, block));
+
+  return expandBlocksForListConversion(selected, range);
 }
 
 function normalizeNativeLists(root: HTMLElement, ordered: boolean) {
@@ -622,6 +976,44 @@ function isMatchingList(el: HTMLElement | null, ordered: boolean): el is HTMLEle
   return Boolean(el && el.tagName === (ordered ? "OL" : "UL"));
 }
 
+export type ListStyle = "card" | "simple";
+
+function getListFromSelection(editorRoot: HTMLElement): HTMLElement | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+
+  const block = getBlockElement(selection.anchorNode, editorRoot);
+  if (!block) return null;
+
+  if (block.tagName === "LI") {
+    const parent = block.parentElement;
+    return parent && (parent.tagName === "UL" || parent.tagName === "OL") ? parent : null;
+  }
+
+  if (block.tagName === "UL" || block.tagName === "OL") {
+    return block;
+  }
+
+  return findParentList(selection.anchorNode, editorRoot);
+}
+
+export function getActiveListStyle(editorRoot: HTMLElement): ListStyle | null {
+  const list = getListFromSelection(editorRoot);
+  if (!list || !list.classList.contains("blog-list")) return null;
+  return list.classList.contains("blog-list--simple") ? "simple" : "card";
+}
+
+export function setListStyle(style: ListStyle, editorRoot: HTMLElement) {
+  const list = getListFromSelection(editorRoot);
+  if (!list || !list.classList.contains("blog-list")) return;
+
+  if (style === "simple") {
+    list.classList.add("blog-list--simple");
+  } else {
+    list.classList.remove("blog-list--simple");
+  }
+}
+
 export function toggleList(ordered: boolean, editorRoot: HTMLElement) {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return;
@@ -631,7 +1023,7 @@ export function toggleList(ordered: boolean, editorRoot: HTMLElement) {
   selection.removeAllRanges();
   selection.addRange(saved);
 
-  const blocks = gatherBlocksForListConversion(selection, editorRoot);
+  let blocks = gatherBlocksForListConversion(selection, editorRoot);
   const listItems = blocks.filter((block) => block.tagName === "LI");
 
   if (listItems.length) {
@@ -647,37 +1039,25 @@ export function toggleList(ordered: boolean, editorRoot: HTMLElement) {
   }
 
   if (!blocks.length) {
-    document.execCommand(ordered ? "insertOrderedList" : "insertUnorderedList");
-    normalizeNativeLists(editorRoot, ordered);
-    return;
+    const caretBlock = getBlockElement(selection.anchorNode, editorRoot);
+    if (
+      !caretBlock ||
+      caretBlock.parentElement !== editorRoot ||
+      caretBlock.tagName === "UL" ||
+      caretBlock.tagName === "OL"
+    ) {
+      return;
+    }
+    blocks = expandBlocksForListConversion([caretBlock], selection.getRangeAt(0));
+    if (!blocks.length) blocks = [caretBlock];
   }
 
   const list = createListElement(ordered);
   const firstBlock = blocks[0];
-  const lastBlock = blocks[blocks.length - 1];
   blocks.forEach((block) => list.appendChild(blockToListItem(block)));
-
-  const prev = firstBlock.previousElementSibling as HTMLElement | null;
-  const next = lastBlock.nextElementSibling as HTMLElement | null;
-
-  if (isMatchingList(prev, ordered)) {
-    while (list.firstChild) prev.appendChild(list.firstChild);
-    blocks.forEach((block) => block.remove());
-    if (isMatchingList(next, ordered)) {
-      while (next.firstChild) prev.appendChild(next.firstChild);
-      next.remove();
-    }
-    placeCursorAtEnd(prev.querySelector("li:last-child") || prev);
-    return;
-  }
 
   editorRoot.insertBefore(list, firstBlock);
   blocks.forEach((block) => block.remove());
-
-  if (isMatchingList(next, ordered)) {
-    while (next.firstChild) list.appendChild(next.firstChild);
-    next.remove();
-  }
 
   placeCursorAtEnd(list.querySelector("li") || list);
 }
