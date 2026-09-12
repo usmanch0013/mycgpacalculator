@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "sync-blog-admin": "node scripts/sync-blog-admin-template.mjs"
+    "sync-blog-admin": "node scripts/sync-blog-admin-template.mjs",
+    "pack-blog-admin": "node scripts/sync-blog-admin-template.mjs && node scripts/build-blog-admin-drop-in.mjs"
   },
   "dependencies": {
     "marked": "^15.0.12",
